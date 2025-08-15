@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Parser Pro - AI-Powered PDF Processing API</title>
+    <meta name="description" content="Revolutionary PDF processing API with AI fallback. 10x cheaper than competitors with 99% cost optimization through smart page-by-page processing.">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="PDF Parser Pro - AI-Powered PDF Processing">
+    <meta property="og:description" content="Smart PDF API that saves 99% on AI costs. Built by an 18-year-old developer.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yoursite.com">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+        
+        .hero .subtitle {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+        
+        .hero .description {
+            font-size: 1.2rem;
+            margin-bottom: 3rem;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 3rem;
+        }
+        
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background: white;
+            color: #667eea;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+        
+        .btn-secondary:hover {
+            background: white;
+            color: #667eea;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        
+        .features {
+            padding: 4rem 2rem;
+            background: #f8f9fa;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: #333;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .feature {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        
+        .pricing {
+            padding: 4rem 2rem;
+            background: white;
+        }
+        
+        .pricing h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: #333;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .pricing-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+        }
+        
+        .pricing-card.featured {
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+        
+        .pricing-card .plan-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        
+        .pricing-card .price {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .pricing-card .price-period {
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        
+        .pricing-card ul {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+        
+        .pricing-card li {
+            margin-bottom: 0.5rem;
+            color: #666;
+        }
+        
+        .pricing-card li:before {
+            content: "✅ ";
+            margin-right: 0.5rem;
+        }
+        
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+        
+        .footer h3 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .footer p {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .hero .subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .cta-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <section class="hero">
+        <div class="container">
+            <h1>PDF Parser Pro</h1>
+            <p class="subtitle">AI-Powered PDF Processing That Actually Works</p>
+            <p class="description">
+                Revolutionary PDF processing API with smart AI fallback. Extract text, tables, and data from any PDF - even scanned documents. 
+                <strong>10x cheaper than competitors</strong> with our breakthrough page-by-page optimization technology.
+            </p>
+            
+            <div class="cta-buttons">
+                <a href="/signup" class="btn btn-primary">Start Free (100 pages)</a>
+                <a href="/docs" class="btn btn-secondary">View API Docs</a>
+            </div>
+            
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-number">99%</span>
+                    <span class="stat-label">Cost Savings vs Direct AI</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">10x</span>
+                    <span class="stat-label">Cheaper Than Google</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">20x</span>
+                    <span class="stat-label">Faster Processing</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">3</span>
+                    <span class="stat-label">AI Models Included</span>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="features">
+        <div class="container">
+            <h2>Why Developers Choose PDF Parser Pro</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">🤖</div>
+                    <h3>Smart AI Fallback</h3>
+                    <p>Automatically switches to AI when traditional parsing fails. OpenAI, Claude, and Gemini included.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">💰</div>
+                    <h3>99% Cost Optimization</h3>
+                    <p>Revolutionary page-by-page processing. Only use expensive AI on pages that actually need it.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightning Fast</h3>
+                    <p>Library-first approach processes 90% of documents instantly. AI kicks in only when needed.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🔧</div>
+                    <h3>Developer Friendly</h3>
+                    <p>Simple REST API, comprehensive docs, multiple SDKs. Get started in 5 minutes.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <h3>Perfect Tables</h3>
+                    <p>Extract tables with structure preserved. Export to CSV, JSON, or Excel format.</p>
+                </div>
+                
+                <div class="feature">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Enterprise Ready</h3>
+                    <p>99.9% uptime SLA, SOC2 compliance, dedicated support. Scale from startup to enterprise.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="pricing">
+        <div class="container">
+            <h2>Simple, Transparent Pricing</h2>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <div class="plan-name">Free</div>
+                    <div class="price">$0</div>
+                    <div class="price-period">forever</div>
+                    <ul>
+                        <li>100 pages/month</li>
+                        <li>Library parsing only</li>
+                        <li>API access</li>
+                        <li>Community support</li>
+                    </ul>
+                    <a href="/signup" class="btn btn-secondary">Get Started</a>
+                </div>
+                
+                <div class="pricing-card featured">
+                    <div class="plan-name">Growth</div>
+                    <div class="price">$19</div>
+                    <div class="price-period">per month</div>
+                    <ul>
+                        <li>2,000 pages/month</li>
+                        <li>AI fallback included</li>
+                        <li>All 3 AI models</li>
+                        <li>Unlimited API calls</li>
+                        <li>Email support</li>
+                    </ul>
+                    <a href="/signup?plan=growth" class="btn btn-primary">Start Growing</a>
+                </div>
+                
+                <div class="pricing-card">
+                    <div class="plan-name">Business</div>
+                    <div class="price">$79</div>
+                    <div class="price-period">per month</div>
+                    <ul>
+                        <li>10,000 pages/month</li>
+                        <li>Priority processing</li>
+                        <li>Advanced analytics</li>
+                        <li>Webhook support</li>
+                        <li>Priority support</li>
+                    </ul>
+                    <a href="/signup?plan=business" class="btn btn-secondary">Scale Up</a>
+                </div>
+                
+                <div class="pricing-card">
+                    <div class="plan-name">Enterprise</div>
+                    <div class="price">$299</div>
+                    <div class="price-period">per month</div>
+                    <ul>
+                        <li>50,000 pages/month</li>
+                        <li>Dedicated processing</li>
+                        <li>Custom integrations</li>
+                        <li>SLA guarantees</li>
+                        <li>Dedicated support</li>
+                    </ul>
+                    <a href="/contact" class="btn btn-secondary">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <section class="footer">
+        <div class="container">
+            <h3>Ready to revolutionize your PDF processing?</h3>
+            <p>Join thousands of developers who've already made the switch.</p>
+            <a href="/signup" class="btn btn-primary">Start Free Today</a>
+        </div>
+    </section>
+    
+    <script>
+        // Simple analytics tracking
+        if (window.gtag) {
+            gtag('event', 'page_view', {
+                page_title: 'Launch Page',
+                page_location: window.location.href
+            });
+        }
+        
+        // Track CTA clicks
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if (window.gtag) {
+                    gtag('event', 'click', {
+                        event_category: 'CTA',
+                        event_label: this.textContent,
+                        value: 1
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

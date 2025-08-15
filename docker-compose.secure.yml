@@ -1,0 +1,183 @@
+version: '3.8'
+
+services:
+  pdf-parser-secure:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"  # Only bind to localhost
+    environment:
+      # Security environment
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - ALLOWED_HOSTS=${DOMAIN},www.${DOMAIN}
+      
+      # Secrets (use Docker secrets in production)
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY}
+      
+      # Master API Keys (encrypted at rest)
+      - MASTER_OPENAI_API_KEY=${MASTER_OPENAI_API_KEY}
+      - MASTER_ANTHROPIC_API_KEY=${MASTER_ANTHROPIC_API_KEY}
+      
+      # Payment processing
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      
+      # Database with SSL
+      - DATABASE_URL=${DATABASE_URL}?sslmode=require
+      - REDIS_URL=redis://redis:6379/0
+      
+      # Security settings
+      - MAX_FILE_SIZE=100MB
+      - MAX_UPLOAD_RATE=10
+      - ENABLE_FILE_SCANNING=true
+      - LOG_SECURITY_EVENTS=true
+      
+    volumes:
+      - ./logs:/app/logs:rw
+      - ./quarantine:/app/quarantine:rw
+      - /tmp:/tmp:noexec,nosuid  # Secure temp directory
+    
+    depends_on:
+      - redis-secure
+      - db-secure
+    
+    restart: unless-stopped
+    
+    # Security constraints
+    security_opt:
+      - no-new-privileges:true
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    
+    command: ["python", "secure_business_api.py"]
+
+  redis-secure:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"  # Only localhost access
+    
+    volumes:
+      - redis_data:/data:rw
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    
+    # Security settings
+    command: redis-server /usr/local/etc/redis/redis.conf
+    
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  db-secure:
+    image: postgres:15-alpine
+    
+    ports:
+      - "127.0.0.1:5432:5432"  # Only localhost access
+    
+    environment:
+      - POSTGRES_DB=pdf_parser_secure
+      - POSTGRES_USER=pdf_parser
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS="--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:rw
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pdf_parser -d pdf_parser_secure"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx-secure:
+    image: nginx:alpine
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      - ./nginx.secure.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx:rw
+    
+    depends_on:
+      - pdf-parser-secure
+    
+    restart: unless-stopped
+    
+    # Security settings
+    security_opt:
+      - no-new-privileges:true
+
+  # Security monitoring
+  fail2ban:
+    image: linuxserver/fail2ban
+    
+    environment:
+      - PUID=1000
+      - PGID=1000
+    
+    volumes:
+      - ./fail2ban:/config:rw
+      - ./logs:/logs:ro
+    
+    restart: unless-stopped
+    
+    # Monitor for attacks
+    depends_on:
+      - nginx-secure
+
+  # Log aggregation
+  fluent-bit:
+    image: fluent/fluent-bit:latest
+    
+    volumes:
+      - ./logs:/logs:ro
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    
+    restart: unless-stopped
+    
+    # Send logs to security monitoring service
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+# Security network
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

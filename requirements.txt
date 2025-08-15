@@ -1,0 +1,28 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pdfplumber==0.10.3
+pymupdf==1.23.26
+pillow==10.1.0
+pandas==2.1.4
+python-magic==0.4.27
+aiofiles==23.2.0
+
+# LLM Integration
+openai==1.12.0
+anthropic==0.18.1
+google-generativeai==0.8.3
+
+# OCR Support
+pytesseract==0.3.10
+opencv-python==4.9.0.80
+
+# Performance and monitoring
+redis==5.0.1
+sqlalchemy==2.0.27
+alembic==1.13.1
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6

@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  pdf-parser-business:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Master API Keys (YOU pay for these)
+      - MASTER_OPENAI_API_KEY=${MASTER_OPENAI_API_KEY}
+      - MASTER_ANTHROPIC_API_KEY=${MASTER_ANTHROPIC_API_KEY}
+      - PREMIUM_OPENAI_API_KEY=${PREMIUM_OPENAI_API_KEY}
+      - PREMIUM_ANTHROPIC_API_KEY=${PREMIUM_ANTHROPIC_API_KEY}
+      
+      # Payment processing
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      
+      # Database & Cache
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@db:5432/pdf_parser_business
+      
+      # Business settings
+      - ENVIRONMENT=production
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - DOMAIN=your-domain.com
+      
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+    command: ["python", "business_main.py"]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=pdf_parser_business
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.business.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - pdf-parser-business
+    restart: unless-stopped
+
+  # Analytics and monitoring
+  analytics:
+    image: metabase/metabase
+    ports:
+      - "3000:3000"
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME=pdf_parser_business
+      - MB_DB_PORT=5432
+      - MB_DB_USER=postgres
+      - MB_DB_PASS=${DB_PASSWORD}
+      - MB_DB_HOST=db
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
