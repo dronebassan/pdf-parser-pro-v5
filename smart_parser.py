@@ -110,8 +110,8 @@ class SmartParser:
             # Check if text extraction was poor and try OCR enhancement
             if len(text.strip()) < 200 and page_count > 0:
                 try:
-                    from ocr_service import create_ocr_service
-                    ocr_service = create_ocr_service()
+                    from ocr_service_simple import create_simple_ocr_service
+                    ocr_service = create_simple_ocr_service()
                     if ocr_service and ocr_service.available:
                         enhanced_text, ocr_confidence = ocr_service.enhance_library_extraction(
                             pdf_path, text, confidence_threshold=0.3

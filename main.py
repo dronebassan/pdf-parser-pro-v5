@@ -14,7 +14,7 @@ import json
 # Import our new services
 from smart_parser import SmartParser, ParseStrategy
 from performance_tracker import PerformanceTracker
-from ocr_service import create_ocr_service
+from ocr_service_simple import create_simple_ocr_service
 from llm_service import create_llm_service
 
 app = FastAPI(
@@ -25,7 +25,7 @@ app = FastAPI(
 
 # Initialize services
 smart_parser = SmartParser()
-ocr_service = create_ocr_service()
+ocr_service = create_simple_ocr_service()
 performance_tracker = PerformanceTracker()
 
 # Mount static files
