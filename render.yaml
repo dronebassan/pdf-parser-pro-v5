@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: pdf-parser-pro
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    region: oregon
+    branch: main
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: GEMINI_API_KEY
+        value: AIzaSyDVwJ_jRxIgifFso36nGWaEOedJYYAuuU8
+      - key: DEFAULT_LLM_PROVIDER
+        value: gemini
+      - key: DEFAULT_STRATEGY
+        value: auto
+      - key: MAX_FILE_SIZE
+        value: 50MB
+      - key: STRIPE_PUBLISHABLE_KEY
+        value: pk_test_your_publishable_key_here
+      - key: STRIPE_SECRET_KEY
+        value: sk_test_your_secret_key_here
+      - key: STRIPE_WEBHOOK_SECRET
+        value: whsec_your_webhook_secret_here
+    healthCheckPath: /health-check/

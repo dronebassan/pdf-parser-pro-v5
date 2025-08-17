@@ -52,12 +52,11 @@ class SmartParser:
         self.confidence_threshold = confidence_threshold
         self.performance_tracker = PerformanceTracker() if enable_performance_tracking else None
         
-        # Initialize LLM services
+        # Initialize Gemini LLM service only
         self.llm_services = {}
-        for provider in ["openai", "anthropic", "gemini"]:
-            service = create_llm_service(provider)
-            if service:
-                self.llm_services[provider] = service
+        service = create_llm_service("gemini")
+        if service:
+            self.llm_services["gemini"] = service
     
     def parse_pdf(
         self,
@@ -113,12 +112,14 @@ class SmartParser:
                     from ocr_service_simple import create_simple_ocr_service
                     ocr_service = create_simple_ocr_service()
                     if ocr_service and ocr_service.available:
-                        enhanced_text, ocr_confidence = ocr_service.enhance_library_extraction(
-                            pdf_path, text, confidence_threshold=0.3
-                        )
-                        if len(enhanced_text.strip()) > len(text.strip()) * 1.2:
-                            text = enhanced_text
-                            print(f"Enhanced text extraction with OCR (confidence: {ocr_confidence:.2f})")
+                        # Use simple OCR extraction for all pages
+                        ocr_results = ocr_service.extract_text_from_pdf(pdf_path)
+                        if ocr_results:
+                            enhanced_text = "\n".join([result.text for result in ocr_results])
+                            if len(enhanced_text.strip()) > len(text.strip()) * 1.2:
+                                text = enhanced_text
+                                avg_confidence = sum(result.confidence for result in ocr_results) / len(ocr_results)
+                                print(f"Enhanced text extraction with OCR (confidence: {avg_confidence:.2f})")
                 except Exception as e:
                     print(f"OCR enhancement failed: {e}")
             

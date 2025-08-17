@@ -67,6 +67,12 @@ uploads/
 *api_key*
 *secret*
 *token*
+GEMINI_API_KEY*
+OPENAI_API_KEY*
+ANTHROPIC_API_KEY*
+
+# Railway specific
+.railway/
 
 # Test files
 test_*.pdf
