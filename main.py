@@ -132,18 +132,85 @@ try:
 except Exception as e:
     print(f"❌ Authentication system failed: {e}")
     print(f"Error details: {type(e).__name__}: {str(e)}")
-    # Create a minimal fallback auth system
+    # Create a complete fallback auth system
     try:
-        class FallbackAuthSystem:
-            def __init__(self):
+        import jwt
+        import hashlib
+        import secrets
+        import time
+        import bcrypt
+        from typing import Optional
+        from dataclasses import dataclass
+        
+        # Define subscription tiers directly
+        class SubscriptionTier:
+            FREE = "free"
+            STUDENT = "student"
+            GROWTH = "growth"
+            BUSINESS = "business"
+        
+        @dataclass
+        class Customer:
+            customer_id: str
+            email: str
+            password_hash: str
+            api_key: str
+            subscription_tier: str
+            created_at: int
+        
+        class SimpleAuthSystem:
+            def __init__(self, secret_key: str):
+                self.secret_key = secret_key
                 self.customers = {}
-                print("⚠️  Using fallback authentication system")
-            def create_customer(self, email, password, subscription_tier=None):
-                raise Exception("Authentication system unavailable - please try again later")
-            def authenticate_password(self, email, password):
+                print("✅ Using simplified authentication system")
+            
+            def generate_api_key(self) -> str:
+                return f"pdf_parser_{secrets.token_urlsafe(32)}"
+            
+            def hash_password(self, password: str) -> str:
+                return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            
+            def verify_password(self, password: str, hashed: str) -> bool:
+                return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+            
+            def create_customer(self, email: str, password: str, subscription_tier = SubscriptionTier.FREE):
+                if self.get_customer_by_email(email):
+                    raise Exception("Email already registered")
+                
+                customer_id = hashlib.md5(email.encode()).hexdigest()
+                api_key = self.generate_api_key()
+                password_hash = self.hash_password(password)
+                
+                customer = Customer(
+                    customer_id=customer_id,
+                    email=email,
+                    password_hash=password_hash,
+                    api_key=api_key,
+                    subscription_tier=subscription_tier,
+                    created_at=int(time.time())
+                )
+                
+                self.customers[email] = customer
+                return customer
+            
+            def authenticate_password(self, email: str, password: str) -> Optional[Customer]:
+                customer = self.customers.get(email)
+                if customer and self.verify_password(password, customer.password_hash):
+                    return customer
                 return None
-        auth_system = FallbackAuthSystem()
-    except:
+            
+            def get_customer_by_email(self, email: str) -> Optional[Customer]:
+                return self.customers.get(email)
+            
+            def get_customer_by_api_key(self, api_key: str) -> Optional[Customer]:
+                for customer in self.customers.values():
+                    if customer.api_key == api_key:
+                        return customer
+                return None
+        
+        auth_system = SimpleAuthSystem(secret_key="pdf-parser-jwt-secret-2024")
+    except Exception as fallback_error:
+        print(f"❌ Fallback auth system also failed: {fallback_error}")
         auth_system = None
 
 # Security
@@ -2182,14 +2249,13 @@ async def register_user(registration: UserRegistration):
             }
         
         # Map plan type to subscription tier
-        from api_key_manager import SubscriptionTier
         tier_map = {
-            "student": SubscriptionTier.STUDENT,
-            "growth": SubscriptionTier.GROWTH,
-            "business": SubscriptionTier.BUSINESS
+            "student": "student",
+            "growth": "growth", 
+            "business": "business"
         }
         
-        subscription_tier = tier_map.get(registration.plan_type.lower(), SubscriptionTier.FREE)
+        subscription_tier = tier_map.get(registration.plan_type.lower(), "free")
         
         # Create customer with password
         customer = auth_system.create_customer(
@@ -2228,7 +2294,7 @@ async def register_user(registration: UserRegistration):
             "success": True,
             "customer_id": customer.customer_id,
             "email": customer.email,
-            "subscription_tier": customer.subscription_tier.value,
+            "subscription_tier": customer.subscription_tier,
             "message": "Account created successfully! You can now login with your email and password."
         }
         
@@ -2485,7 +2551,7 @@ async def login_user(login: UserLogin):
             "success": True,
             "customer_id": customer.customer_id,
             "email": customer.email,
-            "subscription_tier": customer.subscription_tier.value,
+            "subscription_tier": customer.subscription_tier,
             "usage_info": usage_info,
             "message": "Login successful"
         }
@@ -2508,7 +2574,7 @@ async def get_current_user_info(current_user = Depends(get_current_user)):
         "success": True,
         "customer_id": current_user.customer_id,
         "email": current_user.email,
-        "subscription_tier": current_user.subscription_tier.value,
+        "subscription_tier": current_user.subscription_tier,
         "api_key": current_user.api_key,
         "usage_info": usage_info
     }
@@ -2571,7 +2637,7 @@ async def parse_pdf_advanced(
     subscription_tier = "free"
     if current_user:
         user_id = current_user.customer_id
-        subscription_tier = current_user.subscription_tier.value
+        subscription_tier = current_user.subscription_tier
     
     try:
         # Save uploaded file
@@ -2964,11 +3030,11 @@ async def user_dashboard(current_user = Depends(get_current_user)):
             "user": {
                 "customer_id": current_user.customer_id,
                 "email": current_user.email,
-                "subscription_tier": current_user.subscription_tier.value,
+                "subscription_tier": current_user.subscription_tier,
                 "api_key": current_user.api_key
             },
             "subscription": {
-                "tier": current_user.subscription_tier.value,
+                "tier": current_user.subscription_tier,
                 "status": "active"  # You can enhance this with Stripe subscription status
             },
             "usage": {
