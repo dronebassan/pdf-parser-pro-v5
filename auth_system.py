@@ -54,6 +54,17 @@ class AuthSystem:
         """Validate API key and return customer"""
         return self.customers.get(api_key)
     
+    def get_customer_by_api_key(self, api_key: str) -> Optional[Customer]:
+        """Get customer by API key (alias for authenticate_api_key)"""
+        return self.authenticate_api_key(api_key)
+    
+    def get_customer_by_email(self, email: str) -> Optional[Customer]:
+        """Get customer by email"""
+        for customer in self.customers.values():
+            if customer.email == email:
+                return customer
+        return None
+    
     def upgrade_customer(self, api_key: str, new_tier: SubscriptionTier):
         """Upgrade customer subscription"""
         customer = self.authenticate_api_key(api_key)

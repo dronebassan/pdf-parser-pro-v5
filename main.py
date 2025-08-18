@@ -96,6 +96,16 @@ except Exception as e:
     stripe_service = None
     usage_tracker = None
 
+# Initialize Authentication System
+auth_system = None
+try:
+    from auth_system import auth_system
+    print("✅ Authentication system initialized")
+except Exception as e:
+    print(f"❌ Authentication system failed: {e}")
+    print(f"Error details: {type(e).__name__}: {str(e)}")
+    auth_system = None
+
 # Security
 security = HTTPBearer(auto_error=False)
 
@@ -110,6 +120,44 @@ class UsageRequest(BaseModel):
     user_id: str
     pages_processed: int
 
+class UserRegistration(BaseModel):
+    email: str
+    plan_type: str = "student"
+
+class UserLogin(BaseModel):
+    email: str
+    api_key: str
+
+# Authentication dependency
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current authenticated user"""
+    if not credentials or not auth_system:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please provide API key in Authorization header."
+        )
+    
+    try:
+        # Get customer by API key
+        customer = auth_system.get_customer_by_api_key(credentials.credentials)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        return customer
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+
+# Optional authentication for free tier
+async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user, but allow unauthenticated access for free tier"""
+    if not credentials or not auth_system:
+        return None
+    
+    try:
+        customer = auth_system.get_customer_by_api_key(credentials.credentials)
+        return customer
+    except:
+        return None
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     """Home page with PDF upload interface"""
@@ -118,528 +166,642 @@ def home():
     
     html_content = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-        <title>PDF Parser Pro - Revolutionary AI-Powered Processing</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PDF Parser Pro - AI Document Processing</title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <style>
-            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-            body {{ 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            :root {{
+                --primary-color: #2563eb;
+                --primary-hover: #1d4ed8;
+                --secondary-color: #6b7280;
+                --success-color: #059669;
+                --background: #ffffff;
+                --background-secondary: #f8fafc;
+                --background-tertiary: #f1f5f9;
+                --text-primary: #1f2937;
+                --text-secondary: #6b7280;
+                --text-muted: #9ca3af;
+                --border-color: #e5e7eb;
+                --border-hover: #d1d5db;
+                --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+                --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+                --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+                --border-radius: 8px;
+                --border-radius-lg: 12px;
+                --transition: all 0.2s ease-in-out;
+            }}
+            
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            
+            body {{
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
                 line-height: 1.6;
-                color: #333;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: var(--text-primary);
+                background: var(--background);
                 min-height: 100vh;
             }}
-            .container {{ 
+            
+            /* Navigation */
+            .navbar {{
+                position: sticky;
+                top: 0;
+                z-index: 1000;
+                background: var(--background);
+                border-bottom: 1px solid var(--border-color);
+                padding: 1rem 0;
+                box-shadow: var(--shadow-sm);
+            }}
+            
+            .nav-container {{
                 max-width: 1200px;
                 margin: 0 auto;
-                padding: 20px;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(10px);
-                border-radius: 20px;
-                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-                margin-top: 20px;
-                margin-bottom: 20px;
+                padding: 0 2rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
             }}
-            .header {{ 
-                text-align: center; 
-                margin-bottom: 40px;
-                padding: 30px 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                margin: -20px -20px 40px -20px;
-                border-radius: 20px 20px 0 0;
-                color: white;
-            }}
-            .header h1 {{ 
-                font-size: 3.5em;
+            
+            .logo {{
+                font-size: 1.5rem;
                 font-weight: 700;
-                margin-bottom: 10px;
-                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                color: var(--text-primary);
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
             }}
-            .header p {{ 
-                font-size: 1.3em;
-                margin-bottom: 20px;
-                opacity: 0.9;
+            
+            .logo i {{
+                font-size: 1.5rem;
+                color: var(--primary-color);
             }}
-            .features {{ 
-                display: grid; 
-                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-                gap: 25px; 
-                margin: 40px 0;
-            }}
-            .feature-card {{ 
-                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                padding: 25px;
-                border-radius: 15px;
-                border: 1px solid #e9ecef;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-                position: relative;
-                overflow: hidden;
-            }}
-            .feature-card::before {{
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                height: 4px;
-                background: linear-gradient(90deg, #667eea, #764ba2);
-            }}
-            .feature-card:hover {{ 
-                transform: translateY(-5px);
-                box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-            }}
-            .feature-card h4 {{
-                font-size: 1.3em;
-                margin-bottom: 10px;
-                color: #2c3e50;
-                font-weight: 600;
-            }}
-            .upload-area {{ 
-                border: 3px dashed #667eea;
-                padding: 50px;
-                text-align: center;
-                margin: 40px 0;
-                border-radius: 20px;
-                background: linear-gradient(135deg, #f8f9ff 0%, #e6f3ff 100%);
-                transition: all 0.3s ease;
-                position: relative;
-                overflow: hidden;
-            }}
-            .upload-area:hover {{
-                border-color: #764ba2;
-                background: linear-gradient(135deg, #f0f8ff 0%, #e1efff 100%);
-                transform: translateY(-2px);
-                box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
-            }}
-            .upload-container {{
-                position: relative;
-                z-index: 2;
-            }}
-            .upload-icon {{
-                font-size: 4em;
-                margin-bottom: 20px;
-                opacity: 0.8;
-                animation: float 3s ease-in-out infinite;
-            }}
-            @keyframes float {{
-                0%, 100% {{ transform: translateY(0px); }}
-                50% {{ transform: translateY(-10px); }}
-            }}
-            .upload-area h3 {{
-                font-size: 1.8em;
-                margin-bottom: 10px;
-                color: #2c3e50;
-                font-weight: 600;
-            }}
-            .upload-area p {{
-                font-size: 1.1em;
-                color: #666;
-                margin-bottom: 30px;
-                opacity: 0.8;
-            }}
-            .upload-button {{
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 15px 40px;
-                border-radius: 50px;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: 600;
-                display: inline-block;
-                position: relative;
-                overflow: hidden;
-                transition: all 0.3s ease;
-                box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                margin-bottom: 20px;
-            }}
-            .upload-button:hover {{
-                transform: translateY(-3px);
-                box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
-            }}
-            .upload-button span {{
-                position: relative;
-                z-index: 2;
-            }}
-            .upload-button-bg {{
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-                transition: left 0.3s ease;
-                z-index: 1;
-            }}
-            .upload-button:hover .upload-button-bg {{
-                left: 0;
-            }}
-            .file-info {{
-                margin-top: 20px;
-                padding: 20px;
-                background: rgba(255, 255, 255, 0.9);
-                border-radius: 15px;
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(102, 126, 234, 0.2);
-            }}
-            .file-info span {{
-                display: block;
-                font-size: 16px;
-                color: #2c3e50;
-                margin-bottom: 15px;
-                font-weight: 500;
-            }}
-            .process-btn {{
-                background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-                color: white;
-                padding: 12px 30px;
-                border: none;
-                border-radius: 25px;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: 600;
-                position: relative;
-                overflow: hidden;
-                transition: all 0.3s ease;
-                box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }}
-            .process-btn:hover {{
-                transform: translateY(-2px);
-                box-shadow: 0 12px 30px rgba(76, 175, 80, 0.4);
-            }}
-            .process-btn span {{
-                position: relative;
-                z-index: 2;
-            }}
-            .process-btn-bg {{
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(135deg, #45a049 0%, #4caf50 100%);
-                transition: left 0.3s ease;
-                z-index: 1;
-            }}
-            .process-btn:hover .process-btn-bg {{
-                left: 0;
-            }}
-            .btn {{ 
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 15px 40px;
-                border: none;
-                border-radius: 50px;
-                cursor: pointer;
-                font-size: 18px;
-                font-weight: 600;
-                transition: all 0.3s ease;
-                box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }}
-            .btn:hover {{ 
-                transform: translateY(-3px);
-                box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
-            }}
-            .btn:active {{
-                transform: translateY(-1px);
-            }}
-            .result {{ 
-                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                padding: 30px;
-                margin: 30px 0;
-                border-radius: 15px;
-                border: 1px solid #e9ecef;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            }}
-            .status-indicator {{ 
-                display: inline-block; 
-                width: 12px; 
-                height: 12px; 
-                border-radius: 50%; 
-                margin-right: 10px;
-                box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            }}
-            .status-active {{ 
-                background: linear-gradient(135deg, #4caf50, #45a049);
-                box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
-            }}
-            .status-inactive {{ 
-                background: linear-gradient(135deg, #f44336, #d32f2f);
-                box-shadow: 0 0 15px rgba(244, 67, 54, 0.4);
-            }}
-            .advanced-badge {{ 
-                background: linear-gradient(135deg, #4caf50, #8bc34a);
-                color: white;
-                padding: 8px 20px;
-                border-radius: 25px;
-                font-size: 14px;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
-            }}
-            .basic-badge {{ 
-                background: linear-gradient(135deg, #ff9800, #ffc107);
-                color: white;
-                padding: 8px 20px;
-                border-radius: 25px;
-                font-size: 14px;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                box-shadow: 0 5px 15px rgba(255, 152, 0, 0.3);
-            }}
-            .pricing-section {{
-                margin-top: 60px;
-                padding: 40px 0;
-            }}
-            .pricing-section h2 {{
-                text-align: center;
-                font-size: 2.5em;
-                margin-bottom: 20px;
-                color: #2c3e50;
-                font-weight: 700;
-            }}
-            .pricing-grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                gap: 30px;
-                margin-top: 40px;
-            }}
-            .pricing-card {{
-                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-                padding: 35px 25px;
-                border-radius: 20px;
-                border: 2px solid #e9ecef;
-                text-align: center;
-                position: relative;
-                transition: all 0.3s ease;
-                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-            }}
-            .pricing-card:hover {{
-                transform: translateY(-10px);
-                box-shadow: 0 25px 50px rgba(0,0,0,0.15);
-            }}
-            .pricing-card.featured {{
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                border: 3px solid #667eea;
-                transform: scale(1.05);
-                box-shadow: 0 20px 40px rgba(102, 126, 234, 0.3);
-            }}
-            .pricing-card.featured:hover {{
-                transform: scale(1.05) translateY(-10px);
-            }}
-            .pricing-card .price {{
-                font-size: 3em;
-                font-weight: 700;
-                margin: 20px 0;
-                color: #2c3e50;
-            }}
-            .pricing-card.featured .price {{
-                color: white;
-            }}
-            .pricing-card ul {{
+            
+            .nav-links {{
+                display: flex;
+                gap: 2rem;
                 list-style: none;
-                padding: 0;
-                margin: 25px 0;
-                text-align: left;
+                align-items: center;
             }}
-            .pricing-card li {{
-                padding: 8px 0;
-                font-size: 16px;
-                color: #555;
-            }}
-            .pricing-card.featured li {{
-                color: rgba(255,255,255,0.9);
-            }}
-            .pricing-card button {{
-                width: 100%;
-                margin-top: 20px;
-                padding: 15px;
-                font-size: 16px;
-                font-weight: 600;
-                border-radius: 15px;
-                transition: all 0.3s ease;
-            }}
-            .plan-badge {{
-                color: white;
-                padding: 10px 20px;
-                border-radius: 25px;
-                display: inline-block;
-                margin-bottom: 15px;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                font-size: 14px;
-            }}
-            .advantages {{
-                text-align: center;
-                margin-top: 40px;
-                padding: 30px;
-                background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
-                border-radius: 20px;
-                border: 1px solid #e1bee7;
-            }}
-            .advantages h3 {{
-                font-size: 1.8em;
-                margin-bottom: 25px;
-                color: #2c3e50;
-            }}
-            .advantages-grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 20px;
-                margin-top: 20px;
-            }}
-            .advantages-grid div {{
-                font-size: 16px;
+            
+            .nav-links a {{
+                color: var(--text-secondary);
+                text-decoration: none;
                 font-weight: 500;
-                padding: 15px;
-                background: rgba(255,255,255,0.7);
-                border-radius: 10px;
-                backdrop-filter: blur(10px);
+                padding: 0.5rem 1rem;
+                border-radius: var(--border-radius);
+                transition: var(--transition);
             }}
+            
+            .nav-links a:hover {{
+                color: var(--text-primary);
+                background: var(--background-secondary);
+            }}
+            
+            .cta-button {{
+                background: var(--primary-color);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border-radius: var(--border-radius);
+                text-decoration: none;
+                font-weight: 600;
+                transition: var(--transition);
+                box-shadow: var(--shadow-sm);
+            }}
+            
+            .cta-button:hover {{
+                background: var(--primary-hover);
+                box-shadow: var(--shadow-md);
+            }}
+            
+            /* Main Content */
+            .main-content {{
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 3rem 2rem;
+            }}
+            
+            .hero-section {{
+                text-align: center;
+                margin-bottom: 4rem;
+            }}
+            
+            .hero-section h1 {{
+                font-size: clamp(2.5rem, 5vw, 3.5rem);
+                font-weight: 700;
+                color: var(--text-primary);
+                margin-bottom: 1rem;
+                line-height: 1.2;
+            }}
+            
+            .hero-section .subtitle {{
+                font-size: 1.125rem;
+                color: var(--text-secondary);
+                margin-bottom: 2rem;
+                max-width: 600px;
+                margin-left: auto;
+                margin-right: auto;
+                line-height: 1.6;
+            }}
+            
+            .features-row {{
+                display: flex;
+                justify-content: center;
+                gap: 2rem;
+                margin-bottom: 3rem;
+                flex-wrap: wrap;
+            }}
+            
+            .feature-badge {{
+                background: var(--background-secondary);
+                color: var(--text-secondary);
+                padding: 0.5rem 1rem;
+                border-radius: var(--border-radius);
+                font-size: 0.875rem;
+                font-weight: 500;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }}
+            
+            .feature-badge i {{
+                color: var(--success-color);
+            }}
+            
+            /* Upload Section */
+            .upload-container {{
+                background: var(--background);
+                border: 2px solid var(--border-color);
+                border-radius: var(--border-radius-lg);
+                padding: 2rem;
+                margin: 2rem auto;
+                max-width: 800px;
+                box-shadow: var(--shadow-md);
+            }}
+            
+            .upload-area {{
+                border: 2px dashed var(--border-color);
+                padding: 3rem 2rem;
+                text-align: center;
+                border-radius: var(--border-radius);
+                background: var(--background-secondary);
+                transition: var(--transition);
+                cursor: pointer;
+            }}
+            
+            .upload-area:hover {{
+                border-color: var(--primary-color);
+                background: var(--background-tertiary);
+            }}
+            
+            .upload-icon {{
+                font-size: 3rem;
+                margin-bottom: 1rem;
+                color: var(--text-muted);
+            }}
+            
+            .upload-area h3 {{
+                font-size: 1.25rem;
+                margin-bottom: 0.5rem;
+                color: var(--text-primary);
+                font-weight: 600;
+            }}
+            
+            .upload-area p {{
+                color: var(--text-secondary);
+                margin-bottom: 1rem;
+                font-size: 0.875rem;
+            }}
+            
+            .btn-primary {{
+                background: var(--primary-color);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border: none;
+                border-radius: var(--border-radius);
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: var(--transition);
+                box-shadow: var(--shadow-sm);
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+            }}
+            
+            .btn-primary:hover {{
+                background: var(--primary-hover);
+                box-shadow: var(--shadow-md);
+            }}
+            
+            .btn-secondary {{
+                background: var(--background);
+                color: var(--text-primary);
+                padding: 0.75rem 1.5rem;
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius);
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: var(--transition);
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+            }}
+            
+            .btn-secondary:hover {{
+                background: var(--background-secondary);
+                border-color: var(--border-hover);
+            }}
+            
+            /* Loading and Results */
+            .loading {{
+                display: none;
+                text-align: center;
+                padding: 2rem;
+                color: var(--text-secondary);
+            }}
+            
+            .loading.active {{
+                display: block;
+            }}
+            
+            .spinner {{
+                border: 3px solid var(--border-color);
+                border-radius: 50%;
+                border-top: 3px solid var(--primary-color);
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 1rem;
+            }}
+            
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+            
+            .results {{
+                background: var(--background-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius);
+                padding: 1.5rem;
+                margin-top: 2rem;
+                display: none;
+            }}
+            
+            .results.active {{
+                display: block;
+                animation: slideIn 0.3s ease-out;
+            }}
+            
+            @keyframes slideIn {{
+                from {{
+                    opacity: 0;
+                    transform: translateY(10px);
+                }}
+                to {{
+                    opacity: 1;
+                    transform: translateY(0);
+                }}
+            }}
+            
+            .results h3 {{
+                color: var(--text-primary);
+                margin-bottom: 1rem;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }}
+            
+            .results h3 i {{
+                color: var(--success-color);
+            }}
+            
+            .results-content {{
+                background: var(--background);
+                border: 1px solid var(--border-color);
+                padding: 1rem;
+                border-radius: var(--border-radius);
+                color: var(--text-primary);
+                font-family: 'Monaco', 'Consolas', monospace;
+                font-size: 0.875rem;
+                white-space: pre-wrap;
+                max-height: 400px;
+                overflow-y: auto;
+            }}
+            
+            /* Responsive Design */
             @media (max-width: 768px) {{
-                .container {{ margin: 10px; padding: 15px; }}
-                .header h1 {{ font-size: 2.5em; }}
-                .controls {{ grid-template-columns: 1fr; }}
-                .pricing-grid {{ grid-template-columns: 1fr; }}
-                .pricing-card.featured {{ transform: none; }}
+                .nav-container {{
+                    padding: 0 1rem;
+                }}
+                
+                .nav-links {{
+                    display: none;
+                }}
+                
+                .main-content {{
+                    padding: 2rem 1rem;
+                }}
+                
+                .hero-section h1 {{
+                    font-size: 2rem;
+                }}
+                
+                .features-row {{
+                    flex-direction: column;
+                    align-items: center;
+                }}
+                
+                .upload-container {{
+                    margin: 1rem;
+                    padding: 1.5rem;
+                }}
+            }}
+            
+            /* Utility Classes */
+            .text-center {{
+                text-align: center;
+            }}
+            
+            .mb-4 {{
+                margin-bottom: 2rem;
+            }}
+            
+            .hidden {{
+                display: none;
             }}
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <h1>🚀 PDF Parser Pro</h1>
-                <p>Revolutionary 3-Step Fallback System with 99% Cost Optimization</p>
-                <div>
-                    {'<span class="advanced-badge">ALL ADVANCED FEATURES ACTIVE</span>' if advanced_available else '<span class="basic-badge">BASIC MODE ACTIVE</span>'}
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <a href="/" class="logo">
+                    <i class="fas fa-file-pdf"></i>
+                    PDF Parser Pro
+                </a>
+                <ul class="nav-links">
+                    <li><a href="/">Parse PDF</a></li>
+                    <li><a href="/pricing">Pricing</a></li>
+                    <li><a href="/docs">API Docs</a></li>
+                </ul>
+                <a href="/pricing" class="cta-button">Get Started</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Hero Section -->
+            <section class="hero-section">
+                <h1>AI-Powered PDF Processing</h1>
+                <p class="subtitle">
+                    Extract text, tables, and images from any PDF with intelligent 3-step fallback processing.
+                    Fast, accurate, and cost-effective document processing for businesses.
+                </p>
+                
+                <div class="features-row">
+                    <div class="feature-badge">
+                        <i class="fas fa-gift"></i>
+                        10 Pages FREE
+                    </div>
+                    <div class="feature-badge">
+                        <i class="fas fa-brain"></i>
+                        Smart AI Processing
+                    </div>
+                    <div class="feature-badge">
+                        <i class="fas fa-chart-line"></i>
+                        99% Cost Savings
+                    </div>
+                    <div class="feature-badge">
+                        <i class="fas fa-shield-alt"></i>
+                        Enterprise Security
+                    </div>
                 </div>
-            </div>
-            
-            
-            <div class="upload-area">
-                <div class="upload-container">
-                    <div class="upload-icon">📄</div>
-                    <h3>Drop your PDF here or click to browse</h3>
-                    <p>Revolutionary AI will extract every detail with 99% accuracy</p>
-                    <input type="file" id="pdfFile" accept=".pdf" style="display: none;">
-                    <div class="upload-button" onclick="document.getElementById('pdfFile').click()">
-                        <span>Choose PDF File</span>
-                        <div class="upload-button-bg"></div>
+            </section>
+
+            <!-- Upload Section -->
+            <section class="upload-container">
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
                     </div>
-                    <div class="file-info" id="fileInfo" style="display: none;">
-                        <span id="fileName"></span>
-                        <button class="process-btn" onclick="uploadFile()">
-                            <span>🚀 Process with AI</span>
-                            <div class="process-btn-bg"></div>
-                        </button>
-                    </div>
+                    <h3>Upload Your PDF - FREE</h3>
+                    <p>Process up to 10 pages with full AI features • No registration required</p>
+                    <input type="file" id="fileInput" style="display: none;" accept=".pdf" onchange="handleFileSelect(event)">
                 </div>
-            </div>
-            
-            <div id="result" class="result" style="display:none;">
-                <h3>Results:</h3>
-                <div id="output"></div>
-            </div>
-            
-            <!-- Pricing Section -->
-            <div class="pricing-section" style="margin-top: 50px;">
-                <h2 style="text-align: center; margin-bottom: 30px;">💎 Choose Your Plan</h2>
-                <div class="pricing-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                    
-                    <div class="pricing-card">
-                        <div class="plan-badge" style="background: linear-gradient(135deg, #2196f3, #1976d2);">🎓 Student</div>
-                        <div class="price">$4.99<span style="font-size: 0.4em; color: #666;">/month</span></div>
-                        <ul>
-                            <li>✅ 500 pages/month</li>
-                            <li>✅ Revolutionary AI processing</li>
-                            <li>✅ All advanced features</li>
-                            <li>✅ Email support</li>
-                        </ul>
-                        <button class="btn" onclick="subscribe('student')">Choose Student</button>
-                    </div>
-                    
-                    <div class="pricing-card featured">
-                        <div class="plan-badge" style="background: white; color: #667eea; font-weight: 700;">📈 MOST POPULAR</div>
-                        <div class="price">$19.99<span style="font-size: 0.4em; color: rgba(255,255,255,0.8);">/month</span></div>
-                        <ul>
-                            <li>✅ 2,500 pages/month</li>
-                            <li>✅ Priority processing</li>
-                            <li>✅ Advanced analytics</li>
-                            <li>✅ Chat support</li>
-                            <li>✅ API access</li>
-                        </ul>
-                        <button onclick="subscribe('growth')" style="background: white; color: #667eea; padding: 15px; border: none; border-radius: 15px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; transition: all 0.3s ease;">Choose Growth</button>
-                    </div>
-                    
-                    <div class="pricing-card">
-                        <div class="plan-badge" style="background: linear-gradient(135deg, #ff9800, #f57c00);">🏢 Business</div>
-                        <div class="price">$79.99<span style="font-size: 0.4em; color: #666;">/month</span></div>
-                        <ul>
-                            <li>✅ 10,000 pages/month</li>
-                            <li>✅ Faster processing queues</li>
-                            <li>✅ Performance dashboard</li>
-                            <li>✅ Phone + chat support</li>
-                            <li>✅ Full API access</li>
-                            <li>✅ Custom integrations</li>
-                        </ul>
-                        <button class="btn" onclick="subscribe('business')">Choose Business</button>
-                    </div>
-                    
-                    <div class="pricing-card">
-                        <div class="plan-badge" style="background: linear-gradient(135deg, #9c27b0, #7b1fa2);">🏗️ Enterprise</div>
-                        <div class="price">$299.99<span style="font-size: 0.4em; color: #666;">/month</span></div>
-                        <ul>
-                            <li>✅ 50,000 pages/month</li>
-                            <li>✅ Dedicated processing</li>
-                            <li>✅ White-label options</li>
-                            <li>✅ 24/7 priority support</li>
-                            <li>✅ Custom deployment</li>
-                            <li>✅ SLA guarantees</li>
-                        </ul>
-                        <button class="btn" onclick="subscribe('enterprise')">Choose Enterprise</button>
+                
+                <!-- Login/Account Section -->
+                <div id="account-section" style="margin-top: 2rem; text-align: center; display: none;">
+                    <div style="background: var(--background-secondary); padding: 1rem; border-radius: var(--border-radius); margin-bottom: 1rem;">
+                        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Welcome back!</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem;">You're logged in with unlimited processing</p>
+                        <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
+                            <button onclick="showUsage()" class="btn-secondary" style="font-size: 0.875rem; padding: 0.5rem 1rem;">View Usage</button>
+                            <button onclick="logout()" class="btn-secondary" style="font-size: 0.875rem; padding: 0.5rem 1rem;">Logout</button>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="advantages">
-                    <h3>💡 Why Choose PDF Parser Pro?</h3>
-                    <div class="advantages-grid">
-                        <div>🚀 <strong>99% Cost Savings</strong><br>vs Adobe & Google</div>
-                        <div>⚡ <strong>3-Step Fallback</strong><br>Never fails to extract</div>
-                        <div>🧠 <strong>Gemini 2.5 Flash</strong><br>Latest Google AI</div>
-                        <div>📊 <strong>Page-by-Page</strong><br>Revolutionary processing</div>
+                <!-- Quick Login Section -->
+                <div id="login-section" style="margin-top: 2rem; text-align: center;">
+                    <div style="background: var(--background-secondary); padding: 1rem; border-radius: var(--border-radius);">
+                        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Have an account?</h4>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                            <input type="email" id="loginEmail" placeholder="Email" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius);">
+                            <input type="password" id="loginApiKey" placeholder="API Key" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius);">
+                        </div>
+                        <button onclick="quickLogin()" class="btn-primary" style="font-size: 0.875rem; padding: 0.5rem 1.5rem;">Login for Unlimited Processing</button>
+                        <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.5rem;">
+                            Don't have an account? <a href="/pricing" style="color: var(--primary-color);">Get started for $4.99/month</a>
+                        </p>
                     </div>
                 </div>
-            </div>
-        </div>
+                
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Processing your document with AI...</p>
+                </div>
+                
+                <div class="results">
+                    <h3><i class="fas fa-check-circle"></i> Extraction Complete</h3>
+                    <div class="results-content" id="results-content"></div>
+                </div>
+            </section>
+        </main>
 
         <script>
-            // Handle file selection
-            document.getElementById('pdfFile').addEventListener('change', handleFileSelection);
+            // Check if user is logged in on page load
+            window.addEventListener('load', function() {{
+                const apiKey = localStorage.getItem('pdf_parser_api_key');
+                const userEmail = localStorage.getItem('pdf_parser_email');
+                
+                if (apiKey && userEmail) {{
+                    showLoggedInState();
+                }}
+            }});
             
-            function handleFileSelection(e) {{
-                const file = e.target.files[0];
-                displayFileInfo(file);
+            // File upload handling
+            function handleFileSelect(event) {{
+                const file = event.target.files[0];
+                if (file && file.type === 'application/pdf') {{
+                    uploadFile(file);
+                }} else {{
+                    alert('Please select a valid PDF file.');
+                }}
             }}
             
-            function displayFileInfo(file) {{
-                const fileInfo = document.getElementById('fileInfo');
-                const fileName = document.getElementById('fileName');
+            async function uploadFile(file) {{
+                const loadingEl = document.querySelector('.loading');
+                const resultsEl = document.querySelector('.results');
+                const resultsContent = document.getElementById('results-content');
                 
-                if (file) {{
-                    fileName.textContent = `📄 ${{file.name}} (${{(file.size / 1024 / 1024).toFixed(2)}} MB)`;
-                    fileInfo.style.display = 'block';
-                }} else {{
-                    fileInfo.style.display = 'none';
+                // Show loading
+                loadingEl.classList.add('active');
+                resultsEl.classList.remove('active');
+                
+                try {{
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    // Add API key if user is logged in
+                    const apiKey = localStorage.getItem('pdf_parser_api_key');
+                    const headers = {{}};
+                    if (apiKey) {{
+                        headers['Authorization'] = `Bearer ${{apiKey}}`;
+                    }}
+                    
+                    const response = await fetch('/parse/', {{
+                        method: 'POST',
+                        headers: headers,
+                        body: formData
+                    }});
+                    
+                    const result = await response.json();
+                    
+                    // Hide loading
+                    loadingEl.classList.remove('active');
+                    
+                    if (result.success) {{
+                        // Show results with user info
+                        let displayResult = {{
+                            success: result.success,
+                            text: result.text,
+                            pages_processed: result.pages_processed,
+                            strategy_used: result.strategy_used,
+                            user_info: result.user_info
+                        }};
+                        resultsContent.textContent = JSON.stringify(displayResult, null, 2);
+                        resultsEl.classList.add('active');
+                        
+                        // Show upgrade prompt if free user hit limit
+                        if (!result.user_info.authenticated && result.pages_processed >= 10) {{
+                            showUpgradePrompt();
+                        }}
+                    }} else {{
+                        // Handle free tier limit
+                        if (result.detail && typeof result.detail === 'object') {{
+                            showUpgradePrompt(result.detail);
+                        }} else {{
+                            alert('Error: ' + (result.detail || result.error || 'Processing failed'));
+                        }}
+                    }}
+                }} catch (error) {{
+                    loadingEl.classList.remove('active');
+                    alert('Upload failed: ' + error.message);
+                }}
+            }}
+            
+            // Quick login functionality
+            async function quickLogin() {{
+                const email = document.getElementById('loginEmail').value;
+                const apiKey = document.getElementById('loginApiKey').value;
+                
+                if (!email || !apiKey) {{
+                    alert('Please enter both email and API key');
+                    return;
+                }}
+                
+                try {{
+                    const response = await fetch('/auth/login', {{
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        body: JSON.stringify({{email: email, api_key: apiKey}})
+                    }});
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {{
+                        // Store credentials
+                        localStorage.setItem('pdf_parser_api_key', apiKey);
+                        localStorage.setItem('pdf_parser_email', email);
+                        
+                        showLoggedInState();
+                        alert('Login successful! You now have unlimited processing.');
+                    }} else {{
+                        alert('Login failed: ' + result.message);
+                    }}
+                }} catch (error) {{
+                    alert('Login failed: ' + error.message);
+                }}
+            }}
+            
+            // Show logged in state
+            function showLoggedInState() {{
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('account-section').style.display = 'block';
+            }}
+            
+            // Logout
+            function logout() {{
+                localStorage.removeItem('pdf_parser_api_key');
+                localStorage.removeItem('pdf_parser_email');
+                document.getElementById('login-section').style.display = 'block';
+                document.getElementById('account-section').style.display = 'none';
+                alert('Logged out successfully');
+            }}
+            
+            // Show usage info
+            async function showUsage() {{
+                const apiKey = localStorage.getItem('pdf_parser_api_key');
+                if (!apiKey) return;
+                
+                try {{
+                    const response = await fetch('/auth/me', {{
+                        headers: {{'Authorization': `Bearer ${{apiKey}}`}}
+                    }});
+                    const result = await response.json();
+                    
+                    if (result.success) {{
+                        const usage = result.usage_info;
+                        alert(`Usage This Month:
+Pages Used: ${{usage.total_pages || 0}}
+Plan: ${{result.subscription_tier}}
+Total Cost: $${{usage.total_cost || 0}}`);
+                    }}
+                }} catch (error) {{
+                    alert('Could not fetch usage info');
+                }}
+            }}
+            
+            // Show upgrade prompt
+            function showUpgradePrompt(details) {{
+                const message = details ? details.message : 'Upgrade for unlimited processing!';
+                const upgradeUrl = details ? details.upgrade_url : '/pricing';
+                
+                if (confirm(message + '\\n\\nGo to pricing page?')) {{
+                    window.location.href = upgradeUrl;
                 }}
             }}
             
@@ -664,13 +826,13 @@ def home():
             }});
             
             function highlight(e) {{
-                uploadArea.style.background = 'linear-gradient(135deg, #e8f4fd 0%, #d4f1f4 100%)';
-                uploadArea.style.borderColor = '#4caf50';
+                uploadArea.style.borderColor = 'var(--primary-color)';
+                uploadArea.style.background = 'var(--background-tertiary)';
             }}
             
             function unhighlight(e) {{
-                uploadArea.style.background = 'linear-gradient(135deg, #f8f9ff 0%, #e6f3ff 100%)';
-                uploadArea.style.borderColor = '#667eea';
+                uploadArea.style.borderColor = 'var(--border-color)';
+                uploadArea.style.background = 'var(--background-secondary)';
             }}
             
             uploadArea.addEventListener('drop', handleDrop, false);
@@ -678,126 +840,608 @@ def home():
             function handleDrop(e) {{
                 const dt = e.dataTransfer;
                 const files = dt.files;
-                const file = files[0];
                 
-                if (file && file.type === 'application/pdf') {{
-                    document.getElementById('pdfFile').files = files;
-                    displayFileInfo(file);
-                }} else {{
-                    alert('Please drop a PDF file');
-                }}
-            }}
-            
-            async function uploadFile() {{
-                const fileInput = document.getElementById('pdfFile');
-                const file = fileInput.files[0];
-                
-                if (!file) {{
-                    alert('Please select a PDF file');
-                    return;
-                }}
-
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('strategy', 'auto');
-                formData.append('preferred_llm', 'gemini');
-
-                try {{
-                    document.getElementById('result').style.display = 'block';
-                    document.getElementById('output').innerHTML = '🚀 Processing with revolutionary AI...';
-                    
-                    const response = await fetch('/parse/', {{
-                        method: 'POST',
-                        body: formData
-                    }});
-
-                    const result = await response.json();
-                    
-                    if (result.success) {{
-                        let outputHtml = '';
-                        
-                        // Advanced result display
-                        if (result.metadata && result.metadata.advanced_features) {{
-                            outputHtml += '<div style="background: linear-gradient(45deg, #4caf50, #8bc34a); color: white; padding: 10px; border-radius: 5px; margin-bottom: 15px;"><strong>✅ Advanced Processing Complete!</strong></div>';
-                        }}
-                        
-                        outputHtml += '<h4>📄 Extracted Text (' + (result.text ? result.text.length : 0) + ' characters):</h4>';
-                        outputHtml += '<pre style="max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 5px;">' + (result.text || 'No text found') + '</pre>';
-                        
-                        if (result.tables && result.tables.length > 0) {{
-                            outputHtml += '<h4>📊 Tables Found: ' + result.tables.length + '</h4>';
-                        }}
-                        
-                        if (result.images && result.images.length > 0) {{
-                            outputHtml += '<h4>🖼️ Images Found: ' + result.images.length + '</h4>';
-                        }}
-                        
-                        outputHtml += '<h4>⚙️ Processing Details:</h4>';
-                        outputHtml += '<div style="background: #e3f2fd; padding: 15px; border-radius: 5px;">';
-                        outputHtml += '<p><strong>Strategy Used:</strong> ' + result.strategy_used + '</p>';
-                        outputHtml += '<p><strong>Processing Time:</strong> ' + result.processing_time.toFixed(2) + 's</p>';
-                        outputHtml += '<p><strong>Confidence Score:</strong> ' + (result.confidence * 100).toFixed(1) + '%</p>';
-                        
-                        if (result.provider_used) {{
-                            outputHtml += '<p><strong>LLM Provider:</strong> ' + result.provider_used + '</p>';
-                        }}
-                        
-                        if (result.fallback_triggered) {{
-                            outputHtml += '<p style="color: #ff9800;"><strong>⚡ Fallback Triggered:</strong> Advanced AI processing used</p>';
-                        }}
-                        
-                        if (result.metadata) {{
-                            outputHtml += '<p><strong>File Size:</strong> ' + (result.metadata.file_size / 1024).toFixed(1) + ' KB</p>';
-                        }}
-                        
-                        outputHtml += '</div>';
-                        
-                        document.getElementById('output').innerHTML = outputHtml;
+                if (files.length > 0) {{
+                    const file = files[0];
+                    if (file.type === 'application/pdf') {{
+                        uploadFile(file);
                     }} else {{
-                        document.getElementById('output').innerHTML = 
-                            '<div style="background: #f44336; color: white; padding: 10px; border-radius: 5px;"><strong>❌ Error:</strong> ' + (result.error || result.detail) + '</div>';
+                        alert('Please drop a valid PDF file.');
                     }}
-                }} catch (error) {{
-                    document.getElementById('output').innerHTML = 
-                        '<div style="background: #f44336; color: white; padding: 10px; border-radius: 5px;"><strong>❌ Network Error:</strong> ' + error.message + '</div>';
-                }}
-            }}
-            
-            async function subscribe(plan) {{
-                const email = prompt('Enter your email address:');
-                if (!email) return;
-                
-                try {{
-                    const response = await fetch('/create-checkout-session/', {{
-                        method: 'POST',
-                        headers: {{
-                            'Content-Type': 'application/json',
-                        }},
-                        body: JSON.stringify({{
-                            plan_type: plan,
-                            customer_email: email,
-                            success_url: window.location.origin + '/success',
-                            cancel_url: window.location.origin + '/cancel'
-                        }})
-                    }});
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {{
-                        window.location.href = data.checkout_url;
-                    }} else {{
-                        alert('Error creating checkout session: ' + data.error);
-                    }}
-                    
-                }} catch (error) {{
-                    alert('Error: ' + error.message);
                 }}
             }}
         </script>
     </body>
+    </html>"""
+    return html_content
+
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing_page():
+    """Pricing page"""
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Pricing - PDF Parser Pro</title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            :root {
+                --primary-color: #2563eb;
+                --primary-hover: #1d4ed8;
+                --secondary-color: #6b7280;
+                --success-color: #059669;
+                --background: #ffffff;
+                --background-secondary: #f8fafc;
+                --background-tertiary: #f1f5f9;
+                --text-primary: #1f2937;
+                --text-secondary: #6b7280;
+                --text-muted: #9ca3af;
+                --border-color: #e5e7eb;
+                --border-hover: #d1d5db;
+                --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+                --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+                --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+                --border-radius: 8px;
+                --border-radius-lg: 12px;
+                --transition: all 0.2s ease-in-out;
+            }
+            
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                line-height: 1.6;
+                color: var(--text-primary);
+                background: var(--background);
+                min-height: 100vh;
+            }
+            
+            /* Navigation */
+            .navbar {
+                position: sticky;
+                top: 0;
+                z-index: 1000;
+                background: var(--background);
+                border-bottom: 1px solid var(--border-color);
+                padding: 1rem 0;
+                box-shadow: var(--shadow-sm);
+            }
+            
+            .nav-container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 0 2rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .logo {
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: var(--text-primary);
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            
+            .logo i {
+                font-size: 1.5rem;
+                color: var(--primary-color);
+            }
+            
+            .nav-links {
+                display: flex;
+                gap: 2rem;
+                list-style: none;
+                align-items: center;
+            }
+            
+            .nav-links a {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-weight: 500;
+                padding: 0.5rem 1rem;
+                border-radius: var(--border-radius);
+                transition: var(--transition);
+            }
+            
+            .nav-links a:hover, .nav-links a.active {
+                color: var(--text-primary);
+                background: var(--background-secondary);
+            }
+            
+            .cta-button {
+                background: var(--primary-color);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border-radius: var(--border-radius);
+                text-decoration: none;
+                font-weight: 600;
+                transition: var(--transition);
+                box-shadow: var(--shadow-sm);
+            }
+            
+            .cta-button:hover {
+                background: var(--primary-hover);
+                box-shadow: var(--shadow-md);
+            }
+            
+            /* Main Content */
+            .main-content {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 3rem 2rem;
+            }
+            
+            .pricing-header {
+                text-align: center;
+                margin-bottom: 4rem;
+            }
+            
+            .pricing-header h1 {
+                font-size: clamp(2.5rem, 5vw, 3.5rem);
+                font-weight: 700;
+                color: var(--text-primary);
+                margin-bottom: 1rem;
+                line-height: 1.2;
+            }
+            
+            .pricing-header .subtitle {
+                font-size: 1.125rem;
+                color: var(--text-secondary);
+                margin-bottom: 2rem;
+                max-width: 600px;
+                margin-left: auto;
+                margin-right: auto;
+                line-height: 1.6;
+            }
+            
+            .pricing-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 2rem;
+                margin-bottom: 3rem;
+            }
+            
+            .pricing-card {
+                background: var(--background);
+                border: 2px solid var(--border-color);
+                border-radius: var(--border-radius-lg);
+                padding: 2rem;
+                position: relative;
+                transition: var(--transition);
+            }
+            
+            .pricing-card:hover {
+                border-color: var(--primary-color);
+                box-shadow: var(--shadow-lg);
+            }
+            
+            .pricing-card.popular {
+                border-color: var(--primary-color);
+                box-shadow: var(--shadow-md);
+            }
+            
+            .pricing-card.popular::before {
+                content: 'Most Popular';
+                position: absolute;
+                top: -1rem;
+                left: 50%;
+                transform: translateX(-50%);
+                background: var(--primary-color);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: var(--border-radius);
+                font-size: 0.875rem;
+                font-weight: 600;
+            }
+            
+            .plan-name {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+            }
+            
+            .plan-price {
+                font-size: 3rem;
+                font-weight: 700;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+            }
+            
+            .plan-price .currency {
+                font-size: 1.5rem;
+                vertical-align: top;
+            }
+            
+            .plan-price .period {
+                font-size: 1rem;
+                font-weight: 400;
+                color: var(--text-secondary);
+            }
+            
+            .plan-description {
+                color: var(--text-secondary);
+                margin-bottom: 2rem;
+                font-size: 0.875rem;
+            }
+            
+            .plan-features {
+                list-style: none;
+                margin-bottom: 2rem;
+            }
+            
+            .plan-features li {
+                padding: 0.5rem 0;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                color: var(--text-secondary);
+            }
+            
+            .plan-features li i {
+                color: var(--success-color);
+                width: 1rem;
+            }
+            
+            .plan-button {
+                width: 100%;
+                background: var(--primary-color);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border: none;
+                border-radius: var(--border-radius);
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: var(--transition);
+                text-decoration: none;
+                display: block;
+                text-align: center;
+            }
+            
+            .plan-button:hover {
+                background: var(--primary-hover);
+            }
+            
+            .plan-button.secondary {
+                background: var(--background);
+                color: var(--text-primary);
+                border: 2px solid var(--border-color);
+            }
+            
+            .plan-button.secondary:hover {
+                background: var(--background-secondary);
+                border-color: var(--border-hover);
+            }
+            
+            /* FAQ Section */
+            .faq-section {
+                margin-top: 4rem;
+                background: var(--background-secondary);
+                padding: 3rem;
+                border-radius: var(--border-radius-lg);
+            }
+            
+            .faq-header {
+                text-align: center;
+                margin-bottom: 2rem;
+            }
+            
+            .faq-header h2 {
+                font-size: 2rem;
+                font-weight: 700;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+            }
+            
+            .faq-grid {
+                display: grid;
+                gap: 1.5rem;
+                max-width: 800px;
+                margin: 0 auto;
+            }
+            
+            .faq-item {
+                background: var(--background);
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius);
+                padding: 1.5rem;
+            }
+            
+            .faq-question {
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+            }
+            
+            .faq-answer {
+                color: var(--text-secondary);
+                line-height: 1.6;
+            }
+            
+            /* Responsive */
+            @media (max-width: 768px) {
+                .nav-container {
+                    padding: 0 1rem;
+                }
+                
+                .nav-links {
+                    display: none;
+                }
+                
+                .main-content {
+                    padding: 2rem 1rem;
+                }
+                
+                .pricing-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <a href="/" class="logo">
+                    <i class="fas fa-file-pdf"></i>
+                    PDF Parser Pro
+                </a>
+                <ul class="nav-links">
+                    <li><a href="/">Parse PDF</a></li>
+                    <li><a href="/pricing" class="active">Pricing</a></li>
+                    <li><a href="/docs">API Docs</a></li>
+                </ul>
+                <a href="/" class="cta-button">Try Now</a>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Pricing Header -->
+            <section class="pricing-header">
+                <h1>Simple, Transparent Pricing</h1>
+                <p class="subtitle">
+                    Choose the plan that fits your document processing needs. 
+                    Pay only for what you use with our intelligent processing system.
+                </p>
+            </section>
+
+            <!-- Pricing Grid -->
+            <section class="pricing-grid">
+                <div class="pricing-card">
+                    <div class="plan-name">Student</div>
+                    <div class="plan-price">
+                        <span class="currency">$</span>4.99
+                        <span class="period">/month</span>
+                    </div>
+                    <div class="plan-description">Perfect for students and light usage</div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 500 pages/month</li>
+                        <li><i class="fas fa-check"></i> AI-powered processing</li>
+                        <li><i class="fas fa-check"></i> All advanced features</li>
+                        <li><i class="fas fa-check"></i> Email support</li>
+                    </ul>
+                    <a href="#" class="plan-button secondary">Get Started</a>
+                </div>
+
+                <div class="pricing-card popular">
+                    <div class="plan-name">Growth</div>
+                    <div class="plan-price">
+                        <span class="currency">$</span>19.99
+                        <span class="period">/month</span>
+                    </div>
+                    <div class="plan-description">Great for growing businesses</div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 2,500 pages/month</li>
+                        <li><i class="fas fa-check"></i> Priority processing</li>
+                        <li><i class="fas fa-check"></i> Advanced analytics</li>
+                        <li><i class="fas fa-check"></i> Chat support</li>
+                        <li><i class="fas fa-check"></i> API access</li>
+                    </ul>
+                    <a href="#" class="plan-button">Get Started</a>
+                </div>
+
+                <div class="pricing-card">
+                    <div class="plan-name">Business</div>
+                    <div class="plan-price">
+                        <span class="currency">$</span>79.99
+                        <span class="period">/month</span>
+                    </div>
+                    <div class="plan-description">For established businesses with high volume</div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 10,000 pages/month</li>
+                        <li><i class="fas fa-check"></i> Faster processing queues</li>
+                        <li><i class="fas fa-check"></i> Performance dashboard</li>
+                        <li><i class="fas fa-check"></i> Phone + chat support</li>
+                        <li><i class="fas fa-check"></i> Full API access</li>
+                        <li><i class="fas fa-check"></i> Custom integrations</li>
+                    </ul>
+                    <a href="#" class="plan-button">Get Started</a>
+                </div>
+
+                <div class="pricing-card">
+                    <div class="plan-name">Enterprise</div>
+                    <div class="plan-price">
+                        <span class="currency">$</span>299.99
+                        <span class="period">/month</span>
+                    </div>
+                    <div class="plan-description">Maximum processing power and support</div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 50,000 pages/month</li>
+                        <li><i class="fas fa-check"></i> Dedicated processing</li>
+                        <li><i class="fas fa-check"></i> White-label options</li>
+                        <li><i class="fas fa-check"></i> 24/7 priority support</li>
+                        <li><i class="fas fa-check"></i> Custom deployment</li>
+                        <li><i class="fas fa-check"></i> SLA guarantees</li>
+                    </ul>
+                    <a href="#" class="plan-button">Contact Sales</a>
+                </div>
+            </section>
+
+            <!-- FAQ Section -->
+            <section class="faq-section">
+                <div class="faq-header">
+                    <h2>Frequently Asked Questions</h2>
+                </div>
+                <div class="faq-grid">
+                    <div class="faq-item">
+                        <div class="faq-question">How does the 3-step fallback system work?</div>
+                        <div class="faq-answer">We start with fast library-based processing. If that doesn't meet quality standards, we fall back to AI processing. As a final step, we use advanced OCR for the most challenging documents.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">What happens if I exceed my monthly page limit?</div>
+                        <div class="faq-answer">You'll be charged a small overage fee per additional page. Student: $0.01/page, Growth/Business: $0.008/page, Enterprise: $0.006/page.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Do you store my documents?</div>
+                        <div class="faq-answer">No, we have a zero data retention policy. Your documents are processed and immediately deleted from our servers for maximum security.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Can I cancel anytime?</div>
+                        <div class="faq-answer">Yes, you can cancel your subscription at any time. You'll continue to have access until the end of your current billing period.</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </body>
     </html>
     """
     return html_content
+
+# ==================== AUTHENTICATION ENDPOINTS ====================
+
+@app.post("/auth/register")
+async def register_user(registration: UserRegistration):
+    """Register a new user"""
+    if not auth_system:
+        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+    
+    try:
+        # Check if user already exists
+        existing_customer = auth_system.get_customer_by_email(registration.email)
+        if existing_customer:
+            return {
+                "success": False,
+                "error": "User already exists",
+                "api_key": existing_customer.api_key
+            }
+        
+        # Map plan type to subscription tier
+        from api_key_manager import SubscriptionTier
+        tier_map = {
+            "student": SubscriptionTier.STUDENT,
+            "growth": SubscriptionTier.GROWTH,
+            "business": SubscriptionTier.BUSINESS,
+            "enterprise": SubscriptionTier.ENTERPRISE
+        }
+        
+        subscription_tier = tier_map.get(registration.plan_type.lower(), SubscriptionTier.FREE)
+        
+        # Create customer
+        customer = auth_system.create_customer(
+            email=registration.email,
+            subscription_tier=subscription_tier
+        )
+        
+        # Initialize usage tracking for the customer
+        if usage_tracker:
+            # Get plan details for usage limits
+            from datetime import datetime, timedelta
+            plan_details = {
+                "student": {"pages": 500, "rate": 0.01},
+                "growth": {"pages": 2500, "rate": 0.008},
+                "business": {"pages": 10000, "rate": 0.008},
+                "enterprise": {"pages": 50000, "rate": 0.006}
+            }
+            
+            plan = plan_details.get(registration.plan_type.lower(), {"pages": 100, "rate": 0.02})
+            
+            # Set billing cycle (monthly)
+            cycle_start = datetime.now()
+            cycle_end = cycle_start + timedelta(days=30)
+            
+            usage_tracker.update_user_limits(
+                user_id=customer.customer_id,
+                subscription_id="",  # Will be set when Stripe subscription is created
+                plan_type=registration.plan_type.lower(),
+                pages_included=plan["pages"],
+                overage_rate=plan["rate"],
+                billing_cycle_start=cycle_start,
+                billing_cycle_end=cycle_end
+            )
+        
+        return {
+            "success": True,
+            "customer_id": customer.customer_id,
+            "email": customer.email,
+            "api_key": customer.api_key,
+            "subscription_tier": customer.subscription_tier.value,
+            "message": "User registered successfully. Save your API key - you'll need it for authentication."
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+@app.post("/auth/login")
+async def login_user(login: UserLogin):
+    """Verify user credentials and return user info"""
+    if not auth_system:
+        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+    
+    try:
+        # Verify API key
+        customer = auth_system.get_customer_by_api_key(login.api_key)
+        if not customer or customer.email != login.email:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Get usage info if available
+        usage_info = {}
+        if usage_tracker:
+            usage_info = usage_tracker.get_monthly_usage(customer.customer_id)
+        
+        return {
+            "success": True,
+            "customer_id": customer.customer_id,
+            "email": customer.email,
+            "subscription_tier": customer.subscription_tier.value,
+            "usage_info": usage_info,
+            "message": "Login successful"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+
+@app.get("/auth/me")
+async def get_current_user_info(current_user = Depends(get_current_user)):
+    """Get current user information"""
+    
+    # Get usage info
+    usage_info = {}
+    if usage_tracker:
+        usage_info = usage_tracker.get_monthly_usage(current_user.customer_id)
+    
+    return {
+        "success": True,
+        "customer_id": current_user.customer_id,
+        "email": current_user.email,
+        "subscription_tier": current_user.subscription_tier.value,
+        "api_key": current_user.api_key,
+        "usage_info": usage_info
+    }
 
 @app.get("/health-check/")
 def health_check():
@@ -819,7 +1463,7 @@ async def parse_pdf_advanced(
     file: UploadFile = File(...),
     strategy: str = "auto",
     preferred_llm: str = "gemini",
-    user_id: Optional[str] = None
+    current_user = Depends(get_current_user_optional)
 ):
     """Revolutionary PDF parsing with 3-step fallback system and 99% cost optimization"""
     
@@ -829,6 +1473,13 @@ async def parse_pdf_advanced(
     start_time = time.time()
     pages_processed = 0
     ai_used = False
+    
+    # Determine user info and limits
+    user_id = None
+    subscription_tier = "free"
+    if current_user:
+        user_id = current_user.customer_id
+        subscription_tier = current_user.subscription_tier.value
     
     try:
         # Save uploaded file
@@ -845,11 +1496,31 @@ async def parse_pdf_advanced(
         except:
             pages_processed = 1  # Fallback
         
-        # Check usage limits if user is provided
-        if user_id and usage_tracker:
+        # Check usage limits and permissions
+        if current_user and usage_tracker:
+            # Authenticated user - check their limits
             usage_check = usage_tracker.check_user_limits(user_id, pages_processed)
             if not usage_check.get("success", True):
-                raise HTTPException(status_code=429, detail=usage_check.get("error", "Usage limit check failed"))
+                raise HTTPException(
+                    status_code=429, 
+                    detail=f"Usage limit exceeded. {usage_check.get('error', 'Please upgrade your plan or wait for next billing cycle.')}"
+                )
+        elif not current_user:
+            # Unauthenticated user - free tier with generous limits to drive conversions
+            if pages_processed > 10:  # Free tier: max 10 pages per request
+                raise HTTPException(
+                    status_code=401,
+                    detail={
+                        "error": "Free tier limited to 10 pages per document",
+                        "message": "Loved the results? Get 500 more pages for just $4.99/month!",
+                        "upgrade_url": "/pricing",
+                        "register_url": "/auth/register",
+                        "pages_processed": pages_processed,
+                        "pages_limit": 10
+                    }
+                )
+            # Give free users FULL AI features to showcase quality
+            # This creates the "wow factor" that drives conversions
         
         result = None
         
@@ -889,9 +1560,17 @@ async def parse_pdf_advanced(
                         )
                     except Exception as e:
                         print(f"Usage tracking failed: {e}")
+                elif not current_user:
+                    # Track free tier usage (for analytics)
+                    print(f"Free tier usage: {pages_processed} pages processed")
                 
                 # Convert SmartParseResult to API response
                 processing_time = time.time() - start_time
+                
+                # Get updated usage info
+                usage_info = {}
+                if current_user and usage_tracker:
+                    usage_info = usage_tracker.get_monthly_usage(user_id)
                 
                 return {
                     "success": True,
@@ -906,10 +1585,16 @@ async def parse_pdf_advanced(
                     "performance_data": result.performance_comparison,
                     "pages_processed": pages_processed,
                     "ai_used": ai_used,
+                    "user_info": {
+                        "authenticated": current_user is not None,
+                        "subscription_tier": subscription_tier,
+                        "user_id": user_id,
+                        "usage_info": usage_info
+                    },
                     "metadata": {
                         "file_size": os.path.getsize(tmp_path),
                         "strategy_requested": strategy,
-                        "advanced_features": True,
+                        "advanced_features": current_user is not None,
                         "usage_tracked": user_id is not None
                     }
                 }
@@ -998,14 +1683,19 @@ def api_info():
         },
         "endpoints": [
             "/",
+            "/pricing", 
             "/health-check/",
             "/parse/",
             "/api/info",
-            "/pricing",
+            "/auth/register",
+            "/auth/login", 
+            "/auth/me",
             "/create-checkout-session/",
             "/customer-portal/",
             "/stripe-webhook/",
-            "/usage/",
+            "/usage/{user_id}",
+            "/usage/{user_id}/history",
+            "/usage/track/",
             "/docs"
         ]
     }

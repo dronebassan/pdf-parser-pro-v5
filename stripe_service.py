@@ -368,14 +368,100 @@ class StripeService:
     
     def _handle_subscription_created(self, subscription: Dict[str, Any]) -> Dict[str, Any]:
         """Handle new subscription creation"""
-        # Here you would update your database with the new subscription
-        # For now, just return success
-        return {
-            "success": True,
-            "message": "Subscription created",
-            "subscription_id": subscription["id"],
-            "customer_id": subscription["customer"]
-        }
+        try:
+            # Get customer details from Stripe
+            customer = stripe.Customer.retrieve(subscription["customer"])
+            customer_email = customer["email"]
+            
+            # Determine plan type from subscription
+            plan_type = "student"  # default
+            if subscription.get("metadata", {}).get("plan_type"):
+                plan_type = subscription["metadata"]["plan_type"]
+            
+            # Create user account if auth system is available
+            try:
+                from auth_system import auth_system
+                from api_key_manager import SubscriptionTier
+                
+                if auth_system:
+                    existing_customer = auth_system.get_customer_by_email(customer_email)
+                    if not existing_customer:
+                        # Map plan type to subscription tier
+                        tier_map = {
+                            "student": SubscriptionTier.STUDENT,
+                            "growth": SubscriptionTier.GROWTH,
+                            "business": SubscriptionTier.BUSINESS,
+                            "enterprise": SubscriptionTier.ENTERPRISE
+                        }
+                        
+                        subscription_tier = tier_map.get(plan_type.lower(), SubscriptionTier.STUDENT)
+                        new_customer = auth_system.create_customer(
+                            email=customer_email,
+                            subscription_tier=subscription_tier
+                        )
+                        
+                        # Set up usage tracking
+                        try:
+                            from usage_tracker import usage_tracker
+                            from datetime import datetime, timedelta
+                            
+                            if usage_tracker:
+                                plan_details = {
+                                    "student": {"pages": 500, "rate": 0.01},
+                                    "growth": {"pages": 2500, "rate": 0.008},
+                                    "business": {"pages": 10000, "rate": 0.008},
+                                    "enterprise": {"pages": 50000, "rate": 0.006}
+                                }
+                                
+                                plan = plan_details.get(plan_type.lower(), {"pages": 500, "rate": 0.01})
+                                cycle_start = datetime.now()
+                                cycle_end = cycle_start + timedelta(days=30)
+                                
+                                usage_tracker.update_user_limits(
+                                    user_id=new_customer.customer_id,
+                                    subscription_id=subscription["id"],
+                                    plan_type=plan_type.lower(),
+                                    pages_included=plan["pages"],
+                                    overage_rate=plan["rate"],
+                                    billing_cycle_start=cycle_start,
+                                    billing_cycle_end=cycle_end
+                                )
+                        except Exception as e:
+                            print(f"Usage tracking setup failed: {e}")
+                        
+                        print(f"✅ Created user account for {customer_email} with {plan_type} plan")
+                        return {
+                            "success": True,
+                            "message": f"User created and subscription activated for {customer_email}",
+                            "subscription_id": subscription["id"],
+                            "customer_id": subscription["customer"],
+                            "api_key": new_customer.api_key
+                        }
+                    else:
+                        print(f"✅ User {customer_email} already exists, updating subscription")
+                        return {
+                            "success": True,
+                            "message": f"Subscription updated for existing user {customer_email}",
+                            "subscription_id": subscription["id"],
+                            "customer_id": subscription["customer"]
+                        }
+            except Exception as e:
+                print(f"Auth system error: {e}")
+            
+            return {
+                "success": True,
+                "message": "Subscription created",
+                "subscription_id": subscription["id"],
+                "customer_id": subscription["customer"]
+            }
+            
+        except Exception as e:
+            print(f"❌ Error handling subscription creation: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "subscription_id": subscription.get("id", "unknown")
+            }
     
     def _handle_subscription_updated(self, subscription: Dict[str, Any]) -> Dict[str, Any]:
         """Handle subscription updates"""
@@ -387,11 +473,68 @@ class StripeService:
     
     def _handle_subscription_deleted(self, subscription: Dict[str, Any]) -> Dict[str, Any]:
         """Handle subscription cancellation"""
-        return {
-            "success": True,
-            "message": "Subscription cancelled",
-            "subscription_id": subscription["id"]
-        }
+        try:
+            # Get customer details from Stripe
+            customer = stripe.Customer.retrieve(subscription["customer"])
+            customer_email = customer["email"]
+            
+            # Downgrade user to free tier
+            try:
+                from auth_system import auth_system
+                from api_key_manager import SubscriptionTier, api_key_manager
+                
+                if auth_system:
+                    existing_customer = auth_system.get_customer_by_email(customer_email)
+                    if existing_customer:
+                        # Downgrade customer to free tier
+                        success = api_key_manager.downgrade_customer_to_free(existing_customer.customer_id)
+                        
+                        if success:
+                            print(f"✅ Downgraded {customer_email} to free tier (10 pages/month)")
+                            
+                            # Update usage tracker
+                            try:
+                                from usage_tracker import usage_tracker
+                                from datetime import datetime, timedelta
+                                
+                                if usage_tracker:
+                                    cycle_start = datetime.now()
+                                    cycle_end = cycle_start + timedelta(days=30)
+                                    
+                                    usage_tracker.update_user_limits(
+                                        user_id=existing_customer.customer_id,
+                                        subscription_id="",  # No active subscription
+                                        plan_type="free",
+                                        pages_included=10,
+                                        overage_rate=0.0,  # No overage for free tier
+                                        billing_cycle_start=cycle_start,
+                                        billing_cycle_end=cycle_end
+                                    )
+                            except Exception as e:
+                                print(f"Usage tracking update failed: {e}")
+                            
+                            return {
+                                "success": True,
+                                "message": f"Subscription cancelled and user {customer_email} downgraded to free tier",
+                                "subscription_id": subscription["id"],
+                                "customer_id": subscription["customer"]
+                            }
+            except Exception as e:
+                print(f"Error downgrading user: {e}")
+            
+            return {
+                "success": True,
+                "message": "Subscription cancelled",
+                "subscription_id": subscription["id"]
+            }
+            
+        except Exception as e:
+            print(f"❌ Error handling subscription cancellation: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "subscription_id": subscription.get("id", "unknown")
+            }
     
     def _handle_payment_succeeded(self, invoice: Dict[str, Any]) -> Dict[str, Any]:
         """Handle successful payment"""
