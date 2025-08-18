@@ -2763,11 +2763,36 @@ async def parse_pdf_advanced(
             tmp_file.write(content)
             tmp_path = tmp_file.name
         
-        # Get page count for usage tracking
+        # Get accurate "page equivalent" count based on content density
         try:
             doc = fitz.open(tmp_path)
-            pages_processed = len(doc)
+            actual_pages = len(doc)
+            
+            # Extract all text to measure content density
+            total_text = ""
+            for page_num in range(actual_pages):
+                page = doc[page_num]
+                total_text += page.get_text()
+            
             doc.close()
+            
+            # Calculate "processing units" based on content
+            # Average page = ~2000 characters, but adjust for density
+            char_count = len(total_text.strip())
+            
+            if char_count == 0:
+                # No text (images only) - charge for actual pages
+                pages_processed = actual_pages
+            else:
+                # Calculate content-based "page equivalents"
+                # Standard: 1800 chars = 1 processing unit (slightly conservative)
+                content_pages = max(1, char_count // 1800)
+                
+                # Use whichever is higher: actual pages OR content density
+                # This prevents gaming while being fair for normal docs
+                pages_processed = max(actual_pages, content_pages)
+                
+                print(f"📊 Processing analysis: {actual_pages} pages, {char_count} chars → {pages_processed} units")
         except:
             pages_processed = 1  # Fallback
         
