@@ -1039,6 +1039,17 @@ Total Cost: $${usage.total_cost || 0}`);
                 }
             }
             
+            // Debug function to check Stripe status
+            async function debugStripeStatus() {
+                try {
+                    const response = await fetch('/stripe-status/');
+                    const data = await response.json();
+                    alert('🔍 Stripe Debug Info:\\n\\n' + JSON.stringify(data, null, 2));
+                } catch (error) {
+                    alert('❌ Debug Error: ' + error.message);
+                }
+            }
+            
             // Drag and drop functionality
             const uploadArea = document.querySelector('.upload-area');
             
@@ -1469,6 +1480,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
                     <button onclick="createCheckout('student', this)" class="plan-button secondary">Get Started</button>
+                    <button onclick="debugStripeStatus()" style="width: 100%; margin-top: 0.5rem; padding: 0.5rem; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">🔍 Debug Stripe Status</button>
                 </div>
 
                 <div class="pricing-card popular">
@@ -1805,6 +1817,28 @@ async def test_button(request: dict):
     """Simple test endpoint to debug button clicks"""
     print(f"🔥 Test button clicked: {request}")
     return {"success": True, "message": "Button click received!", "data": request}
+
+@app.get("/stripe-status/")
+async def stripe_status():
+    """Debug endpoint to check Stripe service status"""
+    try:
+        from stripe_service import stripe_service, stripe
+        return {
+            "stripe_service_exists": stripe_service is not None,
+            "stripe_service_available": stripe_service.available if stripe_service else False,
+            "stripe_module_exists": stripe is not None,
+            "stripe_api_key_set": stripe.api_key is not None if stripe else False,
+            "environment_check": {
+                "stripe_secret_key": os.getenv("STRIPE_SECRET_KEY") is not None,
+                "stripe_webhook_secret": os.getenv("STRIPE_WEBHOOK_SECRET") is not None
+            }
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "stripe_service_exists": False,
+            "stripe_service_available": False
+        }
 
 @app.post("/parse/")
 async def parse_pdf_advanced(
