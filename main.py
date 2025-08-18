@@ -2343,8 +2343,37 @@ async def create_checkout_session(request: CheckoutRequest):
                 }
                 
             except Exception as e:
-                print(f"❌ Stripe checkout failed: {e}")
-                raise HTTPException(status_code=500, detail=f"Checkout failed: {str(e)}")
+                print(f"❌ Stripe checkout failed: {type(e).__name__}: {e}")
+                
+                # Extract detailed Stripe error information
+                error_details = {
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                }
+                
+                # Get Stripe-specific error details if available
+                if hasattr(e, 'user_message'):
+                    error_details["stripe_user_message"] = e.user_message
+                if hasattr(e, 'code'):
+                    error_details["stripe_code"] = e.code
+                if hasattr(e, 'type'):
+                    error_details["stripe_type"] = e.type
+                if hasattr(e, 'json_body'):
+                    error_details["stripe_json_body"] = e.json_body
+                if hasattr(e, 'http_status'):
+                    error_details["http_status"] = e.http_status
+                    
+                print(f"🔍 Detailed error info: {error_details}")
+                
+                # Return the actual Stripe error message
+                if hasattr(e, 'user_message') and e.user_message:
+                    error_msg = e.user_message
+                elif hasattr(e, 'json_body') and e.json_body:
+                    error_msg = str(e.json_body)
+                else:
+                    error_msg = str(e)
+                    
+                raise HTTPException(status_code=500, detail=f"STRIPE ERROR: {error_msg}")
     
         try:
             # Validate plan type
