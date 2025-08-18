@@ -2306,11 +2306,11 @@ async def create_checkout_session(request: CheckoutRequest):
                 stripe.api_key = api_key
                 print(f"✅ Using YOUR Stripe key: {api_key[:15]}...")
                 
-                # Pre-configured Price IDs (create these in your Stripe Dashboard first)
+                # Your actual Stripe Price IDs
                 price_ids = {
-                    "student": "price_1QZFn6CVZzvkFjSrF8nB8k4k",   # Replace with your actual price ID
-                    "growth": "price_1QZFnoGVZzvkFjSrNm7K9Wjl",    # Replace with your actual price ID  
-                    "business": "price_1QZFoGCVZzvkFjSrYc8tH2mp"   # Replace with your actual price ID
+                    "student": "price_1RxLhYCVZzvkFjSrXR0pCSoO",   # Student Plan: $4.99 CAD/month
+                    "growth": "price_1RxLjPCVZzvkFjSr8Fm6xVAj",    # Growth Plan: $19.99 CAD/month  
+                    "business": "price_1RxLk5CVZzvkFjSrSfrJfv0S"   # Business Plan: $49.99 CAD/month
                 }
                 
                 price_id = price_ids[request.plan_type.lower()]
