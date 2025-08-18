@@ -13,7 +13,13 @@ import json
 from datetime import datetime, timedelta
 
 # Initialize Stripe
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+stripe_api_key = os.getenv("STRIPE_SECRET_KEY")
+if not stripe_api_key:
+    print("❌ STRIPE_SECRET_KEY not found in environment variables")
+    print("Available env vars:", [k for k in os.environ.keys() if 'STRIPE' in k])
+else:
+    stripe.api_key = stripe_api_key
+    print(f"✅ Stripe API key set: {stripe_api_key[:7]}..." if stripe_api_key else "❌ No Stripe API key")
 
 class PlanType(Enum):
     STUDENT = "student"
@@ -95,7 +101,19 @@ class StripeService:
     def create_checkout_session(self, plan_type: PlanType, customer_email: str, success_url: str, cancel_url: str) -> Dict[str, Any]:
         """Create a Stripe checkout session for subscription"""
         
+        # Debug logging
+        print(f"🔥 Creating checkout session for {plan_type}")
+        print(f"🔥 Stripe module available: {stripe is not None}")
+        print(f"🔥 Stripe API key set: {stripe.api_key is not None}")
+        
+        if not stripe.api_key:
+            return {
+                "success": False,
+                "error": "Stripe not configured - missing API key"
+            }
+        
         plan = self.plans[plan_type]
+        print(f"🔥 Using plan: {plan.name} with price ID: {plan.stripe_price_id}")
         
         try:
             checkout_session = stripe.checkout.Session.create(

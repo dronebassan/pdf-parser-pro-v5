@@ -1469,8 +1469,6 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
                     <button onclick="createCheckout('student', this)" class="plan-button secondary">Get Started</button>
-                    <button onclick="alert('BASIC TEST WORKS!')" style="width: 100%; margin-top: 0.5rem; padding: 0.5rem; background: orange; color: white; border: none; border-radius: 4px; cursor: pointer;">🔥 BASIC TEST</button>
-                    <button onclick="testButton('student')" style="width: 100%; margin-top: 0.5rem; padding: 0.5rem; background: red; color: white; border: none; border-radius: 4px; cursor: pointer;">🔥 FUNCTION TEST</button>
                 </div>
 
                 <div class="pricing-card popular">
