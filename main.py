@@ -1676,7 +1676,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> All advanced features</li>
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
-                    <button onclick="createCheckout('student', this)" class="plan-button secondary">Get Started</button>
+                    <button type="button" onclick="createCheckout('student', this)" class="plan-button secondary">Get Started</button>
                 </div>
 
                 <div class="pricing-card popular">
@@ -1694,7 +1694,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Chat support</li>
                         <li><i class="fas fa-check"></i> API access</li>
                     </ul>
-                    <button onclick="createCheckout('growth', this)" class="plan-button">Get Started</button>
+                    <button type="button" onclick="createCheckout('growth', this)" class="plan-button">Get Started</button>
                 </div>
 
                 <div class="pricing-card">
@@ -1713,7 +1713,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Full API access</li>
                         <li><i class="fas fa-check"></i> Custom integrations</li>
                     </ul>
-                    <button onclick="createCheckout('business', this)" class="plan-button">Get Started</button>
+                    <button type="button" onclick="createCheckout('business', this)" class="plan-button">Get Started</button>
                 </div>
             </section>
 
@@ -1772,22 +1772,32 @@ def pricing_page():
             // Stripe Checkout Integration - Fixed version
             // Fixed JavaScript syntax - removed double curly braces
             function createCheckout(planType, buttonElement) {
-                console.log('🔥 CHECKOUT: Function called with planType:', planType);
-                
-                // Show loading state on button
-                var button = buttonElement;
-                if (button) {
-                    var originalText = button.textContent;
-                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-                    button.disabled = true;
+                try {
+                    console.log('🔥 CHECKOUT: Function called with planType:', planType);
+                    
+                    // Show loading state on button
+                    var button = buttonElement;
+                    if (button) {
+                        var originalText = button.textContent;
+                        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+                        button.disabled = true;
+                    }
+                    
+                    console.log('🔥 CHECKOUT: Redirecting to protected subscription route');
+                    
+                    // Add small delay to show loading state
+                    setTimeout(function() {
+                        // Redirect to protected route - it will handle authentication check
+                        // If user is not logged in, they'll be redirected to register with plan pre-selected
+                        // If user is logged in, they'll be redirected to Stripe Payment Link
+                        console.log('🔥 CHECKOUT: Actually redirecting now to /subscribe/' + planType);
+                        window.location.href = '/subscribe/' + planType;
+                    }, 100);
+                    
+                } catch (error) {
+                    console.error('❌ CHECKOUT ERROR:', error);
+                    alert('Error: ' + error.message);
                 }
-                
-                console.log('🔥 CHECKOUT: Redirecting to protected subscription route');
-                
-                // Redirect to protected route - it will handle authentication check
-                // If user is not logged in, they'll be redirected to register with plan pre-selected
-                // If user is logged in, they'll be redirected to Stripe Payment Link
-                window.location.href = '/subscribe/' + planType;
             }
             
             // Initialize when DOM is ready
