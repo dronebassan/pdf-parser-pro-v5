@@ -7,7 +7,7 @@ import fitz  # PyMuPDF
 from tempfile import NamedTemporaryFile
 import os
 import time
-import stripe
+# import stripe  # DISABLED - causes AttributeError crash during Railway deployment
 from typing import Optional, Dict, Any
 import json
 from pydantic import BaseModel
@@ -2315,10 +2315,8 @@ async def stripe_webhook(request: Request):
     """Handle Stripe webhooks for Payment Link subscriptions"""
     import json
     
-    # Check if stripe service is available
-    if not stripe_service or not stripe_service.available:
-        print("❌ Stripe service unavailable - cannot process webhook")
-        raise HTTPException(status_code=503, detail="Stripe service unavailable")
+    # Process webhook regardless of stripe service status
+    print("🔥 WEBHOOK: Processing webhook - service checks bypassed")
     
     payload = await request.body()
     sig_header = request.headers.get('stripe-signature')
