@@ -972,12 +972,19 @@ def home():
 
         <script>
             // Check if user is logged in on page load
-            window.addEventListener('load', function() {
-                const apiKey = localStorage.getItem('pdf_parser_api_key');
-                const userEmail = localStorage.getItem('pdf_parser_email');
-                
-                if (apiKey && userEmail) {
-                    showLoggedInState();
+            window.addEventListener('load', async function() {
+                try {
+                    const response = await fetch('/auth/me', {
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success) {
+                            showLoggedInState();
+                        }
+                    }
+                } catch (error) {
+                    console.log('User not logged in');
                 }
             });
             
@@ -1335,12 +1342,9 @@ def home():
             
             // Show usage info
             async function showUsage() {
-                const apiKey = localStorage.getItem('pdf_parser_api_key');
-                if (!apiKey) return;
-                
                 try {
                     const response = await fetch('/auth/me', {
-                        headers: {'Authorization': `Bearer ${apiKey}`}
+                        credentials: 'include'  // Include cookies for session auth
                     });
                     const result = await response.json();
                     
@@ -1358,12 +1362,9 @@ Total Cost: $${usage.total_cost || 0}`);
             
             // Update usage tracker in navbar
             async function updateUsageTracker() {
-                const apiKey = localStorage.getItem('pdf_parser_api_key');
-                if (!apiKey) return;
-                
                 try {
                     const response = await fetch('/auth/me', {
-                        headers: {'Authorization': `Bearer ${apiKey}`}
+                        credentials: 'include'  // Include cookies for session auth
                     });
                     const result = await response.json();
                     
@@ -2633,13 +2634,18 @@ async def login_user(login: UserLogin):
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @app.get("/auth/me")
-async def get_current_user_info(current_user = Depends(get_current_user)):
+async def get_current_user_info(request: Request, current_user = Depends(get_current_user_optional)):
     """Get current user information"""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     
     # Get usage info
-    usage_info = {}
+    usage_info = {"total_pages": 0, "total_cost": 0}
     if usage_tracker:
-        usage_info = usage_tracker.get_monthly_usage(current_user.customer_id)
+        try:
+            usage_info = usage_tracker.get_monthly_usage(current_user.customer_id)
+        except:
+            pass
     
     return {
         "success": True,
