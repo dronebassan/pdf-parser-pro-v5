@@ -207,6 +207,14 @@ except Exception as e:
                     if customer.api_key == api_key:
                         return customer
                 return None
+            
+            def upgrade_customer(self, email: str, new_tier: str) -> bool:
+                """Upgrade customer subscription tier"""
+                customer = self.get_customer_by_email(email)
+                if customer:
+                    customer.subscription_tier = new_tier
+                    return True
+                return False
         
         auth_system = SimpleAuthSystem(secret_key="pdf-parser-jwt-secret-2024")
     except Exception as fallback_error:
@@ -3051,30 +3059,24 @@ async def stripe_webhook(request: Request):
                     plan = "growth"
                 
                 # Upgrade account if email matches existing user
-                if auth_system:
+                if auth_system and hasattr(auth_system, 'upgrade_customer'):
                     try:
-                        existing_customer = auth_system.get_customer_by_email(customer_email)
-                        if existing_customer:
-                            print(f"✅ Found matching account! Upgrading {customer_email} to {plan}")
-                            
-                            # Update subscription tier
-                            try:
-                                from api_key_manager import SubscriptionTier, api_key_manager
-                                tier_map = {
-                                    "student": SubscriptionTier.STUDENT,
-                                    "growth": SubscriptionTier.GROWTH, 
-                                    "business": SubscriptionTier.BUSINESS
-                                }
-                                tier = tier_map[plan]
-                                api_key_manager.update_customer_subscription(existing_customer.customer_id, tier)
-                                print(f"🎯 Successfully upgraded {customer_email} to {tier.value} tier")
-                            except Exception as tier_error:
-                                print(f"❌ Tier upgrade failed: {tier_error}")
+                        tier_map = {
+                            "student": "student",
+                            "growth": "growth", 
+                            "business": "business"
+                        }
+                        new_tier = tier_map.get(plan.lower(), "student")
+                        
+                        if auth_system.upgrade_customer(customer_email, new_tier):
+                            print(f"🎯 Successfully upgraded {customer_email} to {new_tier} tier")
                         else:
                             print(f"📋 Payment received but no account found for {customer_email}")
                             print(f"💡 User must register with email {customer_email} to access paid features")
                     except Exception as e:
                         print(f"⚠️  Account upgrade process failed: {e}")
+                else:
+                    print(f"⚠️  Auth system not available for upgrade processing")
         
         return {"status": "success", "message": "webhook processed"}
         
