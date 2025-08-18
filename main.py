@@ -165,7 +165,7 @@ def home():
     # Check if advanced features are available
     advanced_available = all(services_status.values())
     
-    html_content = f"""
+    html_content = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
