@@ -3,7 +3,6 @@ Stripe Payment and Subscription Service
 Handles all billing, subscriptions, and usage tracking
 """
 
-import stripe
 import os
 import time
 from typing import Dict, List, Optional, Any
@@ -12,14 +11,28 @@ from enum import Enum
 import json
 from datetime import datetime, timedelta
 
-# Initialize Stripe
-stripe_api_key = os.getenv("STRIPE_SECRET_KEY")
-if not stripe_api_key:
-    print("❌ STRIPE_SECRET_KEY not found in environment variables")
-    print("Available env vars:", [k for k in os.environ.keys() if 'STRIPE' in k])
-else:
-    stripe.api_key = stripe_api_key
-    print(f"✅ Stripe API key set: {stripe_api_key[:7]}..." if stripe_api_key else "❌ No Stripe API key")
+# Initialize Stripe with comprehensive error handling
+stripe = None
+try:
+    import stripe as stripe_module
+    stripe = stripe_module
+    print("✅ Stripe module imported successfully")
+    
+    stripe_api_key = os.getenv("STRIPE_SECRET_KEY")
+    if not stripe_api_key:
+        print("❌ STRIPE_SECRET_KEY not found in environment variables")
+        print("Available env vars:", [k for k in os.environ.keys() if 'STRIPE' in k])
+        stripe = None  # Disable stripe if no API key
+    else:
+        stripe.api_key = stripe_api_key
+        print(f"✅ Stripe API key set: {stripe_api_key[:7]}..." if stripe_api_key else "❌ No Stripe API key")
+        
+except ImportError as e:
+    print(f"❌ Failed to import Stripe: {e}")
+    stripe = None
+except Exception as e:
+    print(f"❌ Error initializing Stripe: {e}")
+    stripe = None
 
 class PlanType(Enum):
     STUDENT = "student"
@@ -50,6 +63,14 @@ class Customer:
 
 class StripeService:
     def __init__(self):
+        # Check if Stripe is available
+        if stripe is None:
+            print("❌ StripeService: Cannot initialize - Stripe module unavailable")
+            self.available = False
+            self.plans = {}
+            return
+        
+        self.available = True
         self.plans = {
             PlanType.STUDENT: Plan(
                 name="Student Plan",
@@ -103,7 +124,15 @@ class StripeService:
         
         # Debug logging
         print(f"🔥 Creating checkout session for {plan_type}")
+        print(f"🔥 StripeService available: {self.available}")
         print(f"🔥 Stripe module available: {stripe is not None}")
+        
+        if not self.available or stripe is None:
+            return {
+                "success": False,
+                "error": "Stripe service unavailable - module not imported or API key missing"
+            }
+            
         print(f"🔥 Stripe API key set: {stripe.api_key is not None}")
         
         if not stripe.api_key:
@@ -556,4 +585,13 @@ class StripeService:
         }
 
 # Global instance
-stripe_service = StripeService()
+try:
+    stripe_service = StripeService()
+    if not stripe_service.available:
+        print("❌ StripeService initialized but not available")
+        stripe_service = None
+    else:
+        print("✅ StripeService initialized successfully")
+except Exception as e:
+    print(f"❌ Failed to create StripeService: {e}")
+    stripe_service = None
