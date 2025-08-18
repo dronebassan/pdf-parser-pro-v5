@@ -2302,12 +2302,11 @@ async def create_checkout_session(request: CheckoutRequest):
         # Skip API completely - use direct pre-made Payment Links
         print("✅ Using pre-made Payment Links - NO API NEEDED")
         
-        # You need to create these Payment Links in your Stripe Dashboard
-        # Go to Products -> Payment Links -> Create Payment Link for each plan
+        # Your actual Payment Links from Stripe Dashboard
         payment_links = {
-            "student": "https://buy.stripe.com/00g00000000000000000",   # Replace with your actual Payment Link
-            "growth": "https://buy.stripe.com/00g00000000000000001",    # Replace with your actual Payment Link
-            "business": "https://buy.stripe.com/00g00000000000000002"   # Replace with your actual Payment Link
+            "student": "https://buy.stripe.com/4gM14m11zaRk2ELcT6e3e04",    # Student Plan: $4.99 CAD/month
+            "growth": "https://buy.stripe.com/4gMeVcfWt4sW7Z5cT6e3e05",     # Growth Plan: $19.99 CAD/month
+            "business": "https://buy.stripe.com/eVq9AS25D3oS5QX2ese3e06"    # Business Plan: $49.99 CAD/month
         }
         
         checkout_url = payment_links.get(request.plan_type.lower(), payment_links["student"])
