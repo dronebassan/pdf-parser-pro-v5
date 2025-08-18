@@ -2313,8 +2313,12 @@ async def customer_portal(customer_id: str, return_url: str = "https://your-doma
 @app.post("/stripe-webhook/")
 async def stripe_webhook(request: Request):
     """Handle Stripe webhooks for Payment Link subscriptions"""
-    import stripe
     import json
+    
+    # Check if stripe service is available
+    if not stripe_service or not stripe_service.available:
+        print("❌ Stripe service unavailable - cannot process webhook")
+        raise HTTPException(status_code=503, detail="Stripe service unavailable")
     
     payload = await request.body()
     sig_header = request.headers.get('stripe-signature')
@@ -2322,8 +2326,13 @@ async def stripe_webhook(request: Request):
     
     try:
         # Verify webhook signature if secret is set
-        if endpoint_secret:
-            event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        if endpoint_secret and sig_header:
+            try:
+                event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+                print("✅ Webhook signature verified")
+            except Exception as sig_error:
+                print(f"❌ Webhook signature verification failed: {sig_error}")
+                raise HTTPException(status_code=400, detail="Invalid webhook signature")
         else:
             # For development - skip signature verification
             event = json.loads(payload)
@@ -2331,8 +2340,9 @@ async def stripe_webhook(request: Request):
             
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        print(f"❌ Webhook processing error: {e}")
+        raise HTTPException(status_code=400, detail="Webhook processing failed")
     
     print(f"📨 Received webhook: {event['type']}")
     
@@ -2344,6 +2354,13 @@ async def stripe_webhook(request: Request):
         try:
             # Get customer info from Stripe
             customer_id = session['customer']
+            
+            # Use safe stripe import from stripe_service
+            from stripe_service import stripe
+            if not stripe:
+                print("❌ Stripe module unavailable in webhook")
+                return {"status": "error", "message": "Stripe unavailable"}
+            
             customer = stripe.Customer.retrieve(customer_id)
             customer_email = customer['email']
             
@@ -2432,6 +2449,12 @@ async def stripe_webhook(request: Request):
         
         # Downgrade user to free tier
         try:
+            # Use safe stripe import from stripe_service
+            from stripe_service import stripe
+            if not stripe:
+                print("❌ Stripe module unavailable for subscription cancellation")
+                return {"status": "error", "message": "Stripe unavailable"}
+            
             customer = stripe.Customer.retrieve(subscription['customer'])
             customer_email = customer['email']
             
