@@ -254,17 +254,32 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
+# Simple session storage (in production, use Redis or database)
+active_sessions = {}
+
 # Optional authentication for free tier
-async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user_optional(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Get current user, but allow unauthenticated access for free tier"""
-    if not credentials or not auth_system:
+    if not auth_system:
         return None
     
-    try:
-        customer = auth_system.get_customer_by_api_key(credentials.credentials)
-        return customer
-    except:
-        return None
+    # Check for session-based auth first (for web UI)
+    session_token = request.cookies.get("session_token")
+    if session_token and session_token in active_sessions:
+        email = active_sessions[session_token]
+        customer = auth_system.get_customer_by_email(email)
+        if customer:
+            return customer
+    
+    # Fallback to API key auth (for API usage)
+    if credentials:
+        try:
+            customer = auth_system.get_customer_by_api_key(credentials.credentials)
+            return customer
+        except:
+            pass
+    
+    return None
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -2211,6 +2226,13 @@ async def register_page(plan: str = "student"):
                     if (data.success) {{
                         messageDiv.innerHTML = '<div class="success">Account created successfully! Redirecting to payment...</div>';
                         
+                        // Store user info in localStorage for session management
+                        if (data.customer_id) {{
+                            localStorage.setItem('pdf_parser_customer_id', data.customer_id);
+                            localStorage.setItem('pdf_parser_email', data.email);
+                            localStorage.setItem('pdf_parser_subscription_tier', data.subscription_tier);
+                        }}
+                        
                         // Store login info and redirect to Stripe
                         setTimeout(() => {{
                             window.location.href = '/subscribe/{plan}';
@@ -2290,13 +2312,30 @@ async def register_user(registration: UserRegistration):
                 billing_cycle_end=cycle_end
             )
         
-        return {
+        # Create session token for immediate login
+        import secrets
+        session_token = secrets.token_urlsafe(32)
+        active_sessions[session_token] = customer.email
+        
+        from fastapi.responses import JSONResponse
+        response_data = {
             "success": True,
             "customer_id": customer.customer_id,
             "email": customer.email,
             "subscription_tier": customer.subscription_tier,
             "message": "Account created successfully! You can now login with your email and password."
         }
+        
+        response = JSONResponse(content=response_data)
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            max_age=86400 * 7,  # 7 days
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax"
+        )
+        return response
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
@@ -2502,6 +2541,13 @@ async def login_page(plan: str = "student"):
                     if (data.success) {{
                         messageDiv.innerHTML = '<div class="success">Sign in successful! Redirecting to payment...</div>';
                         
+                        // Store user info in localStorage for session management
+                        if (data.customer_id) {{
+                            localStorage.setItem('pdf_parser_customer_id', data.customer_id);
+                            localStorage.setItem('pdf_parser_email', data.email);
+                            localStorage.setItem('pdf_parser_subscription_tier', data.subscription_tier);
+                        }}
+                        
                         // Redirect to subscription route
                         setTimeout(() => {{
                             window.location.href = '/subscribe/{plan}';
@@ -2547,7 +2593,13 @@ async def login_user(login: UserLogin):
         if usage_tracker:
             usage_info = usage_tracker.get_monthly_usage(customer.customer_id)
         
-        return {
+        # Create session token
+        import secrets
+        session_token = secrets.token_urlsafe(32)
+        active_sessions[session_token] = customer.email
+        
+        from fastapi.responses import JSONResponse
+        response_data = {
             "success": True,
             "customer_id": customer.customer_id,
             "email": customer.email,
@@ -2555,6 +2607,17 @@ async def login_user(login: UserLogin):
             "usage_info": usage_info,
             "message": "Login successful"
         }
+        
+        response = JSONResponse(content=response_data)
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            max_age=86400 * 7,  # 7 days
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax"
+        )
+        return response
         
     except HTTPException:
         raise
