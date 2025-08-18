@@ -122,11 +122,12 @@ class UsageRequest(BaseModel):
 
 class UserRegistration(BaseModel):
     email: str
+    password: str
     plan_type: str = "student"
 
 class UserLogin(BaseModel):
     email: str
-    api_key: str
+    password: str
 
 # Authentication dependency
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -620,7 +621,7 @@ def home():
                         <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Have an account?</h4>
                         <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
                             <input type="email" id="loginEmail" placeholder="Email" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius);">
-                            <input type="password" id="loginApiKey" placeholder="API Key" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius);">
+                            <input type="password" id="loginPassword" placeholder="Password" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius);">
                         </div>
                         <button onclick="quickLogin()" class="btn-primary" style="font-size: 0.875rem; padding: 0.5rem 1.5rem;">Login for Unlimited Processing</button>
                         <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.5rem;">
@@ -726,10 +727,10 @@ def home():
             // Quick login functionality
             async function quickLogin() {{
                 const email = document.getElementById('loginEmail').value;
-                const apiKey = document.getElementById('loginApiKey').value;
+                const password = document.getElementById('loginPassword').value;
                 
-                if (!email || !apiKey) {{
-                    alert('Please enter both email and API key');
+                if (!email || !password) {{
+                    alert('Please enter both email and password');
                     return;
                 }}
                 
@@ -737,15 +738,15 @@ def home():
                     const response = await fetch('/auth/login', {{
                         method: 'POST',
                         headers: {{'Content-Type': 'application/json'}},
-                        body: JSON.stringify({{email: email, api_key: apiKey}})
+                        body: JSON.stringify({{email: email, password: password}})
                     }});
                     
                     const result = await response.json();
                     
                     if (result.success) {{
-                        // Store credentials
-                        localStorage.setItem('pdf_parser_api_key', apiKey);
+                        // Store user session
                         localStorage.setItem('pdf_parser_email', email);
+                        localStorage.setItem('pdf_parser_logged_in', 'true');
                         
                         showLoggedInState();
                         alert('Login successful! You now have unlimited processing.');
@@ -1349,9 +1350,10 @@ async def register_user(registration: UserRegistration):
         
         subscription_tier = tier_map.get(registration.plan_type.lower(), SubscriptionTier.FREE)
         
-        # Create customer
+        # Create customer with password
         customer = auth_system.create_customer(
             email=registration.email,
+            password=registration.password,
             subscription_tier=subscription_tier
         )
         
@@ -1386,9 +1388,8 @@ async def register_user(registration: UserRegistration):
             "success": True,
             "customer_id": customer.customer_id,
             "email": customer.email,
-            "api_key": customer.api_key,
             "subscription_tier": customer.subscription_tier.value,
-            "message": "User registered successfully. Save your API key - you'll need it for authentication."
+            "message": "Account created successfully! You can now login with your email and password."
         }
         
     except Exception as e:
@@ -1401,10 +1402,10 @@ async def login_user(login: UserLogin):
         raise HTTPException(status_code=503, detail="Authentication service unavailable")
     
     try:
-        # Verify API key
-        customer = auth_system.get_customer_by_api_key(login.api_key)
-        if not customer or customer.email != login.email:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+        # Verify email and password
+        customer = auth_system.authenticate_password(login.email, login.password)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
         
         # Get usage info if available
         usage_info = {}
