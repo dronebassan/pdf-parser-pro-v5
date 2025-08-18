@@ -9,8 +9,18 @@ import pandas as pd
 from tempfile import NamedTemporaryFile
 import base64
 
-from llm_service import LLMService, create_llm_service, ParseResult
-from performance_tracker import PerformanceTracker, PerformanceMetrics
+try:
+    from llm_service import LLMService, create_llm_service, ParseResult
+except ImportError:
+    LLMService = None
+    create_llm_service = None
+    ParseResult = None
+
+try:
+    from performance_tracker import PerformanceTracker, PerformanceMetrics
+except ImportError:
+    PerformanceTracker = None
+    PerformanceMetrics = None
 
 class ParseStrategy(Enum):
     LIBRARY_ONLY = "library_only"
