@@ -2120,117 +2120,25 @@ async def create_checkout_session(request: CheckoutRequest):
         print(f"🔥 Stripe service status: {stripe_service is not None}")
         
         if not stripe_service:
-            print("❌ Stripe service is None - FORCING direct Stripe integration")
-        # FORCE direct Stripe initialization using environment variables
-        try:
-            import stripe
-            from stripe_service import PlanType, Plan
-            
-            # Get your Stripe key from environment (Railway will have it)
-            api_key = (
-                os.getenv("STRIPE_SECRET_KEY") or
-                os.getenv("STRIPE_SECRET") or
-                os.getenv("STRIPE_API_KEY")
-            )
-            
-            if not api_key:
-                print("❌ No Stripe API key found in environment")
-                raise HTTPException(status_code=500, detail="Stripe API key not configured on Railway")
-            
-            stripe.api_key = api_key
-            print("🔥 FORCED: Using Stripe key from Railway environment")
-            
-            # Test connection with detailed debugging
-            print(f"🔍 Testing Stripe API key: {api_key[:12]}...")
-            try:
-                account = stripe.Account.retrieve()
-                print(f"✅ FORCED: Connected to Stripe account {account.id}")
-                print(f"   Account type: {getattr(account, 'type', 'unknown')}")
-                print(f"   Country: {getattr(account, 'country', 'unknown')}")
-                print(f"   Business type: {getattr(account, 'business_type', 'unknown')}")
-                print(f"   Charges enabled: {getattr(account, 'charges_enabled', 'unknown')}")
-                print(f"   Details submitted: {getattr(account, 'details_submitted', 'unknown')}")
-            except stripe.error.AuthenticationError as e:
-                print(f"❌ Authentication failed: {e}")
-                raise HTTPException(status_code=500, detail=f"Stripe API key invalid: {str(e)}")
-            except stripe.error.PermissionError as e:
-                print(f"❌ Permission denied: {e}")
-                raise HTTPException(status_code=500, detail=f"Stripe API key lacks permissions: {str(e)}")
-            except Exception as e:
-                print(f"❌ Account retrieval failed: {type(e).__name__}: {e}")
-                print(f"   Error attributes: {dir(e) if hasattr(e, '__dict__') else 'none'}")
-                raise HTTPException(status_code=500, detail=f"Stripe account error: {str(e)}")
-            
-            # Map plan types to prices
-            plan_configs = {
-                "student": {"name": "Student Plan", "price": 4.99},
-                "growth": {"name": "Growth Plan", "price": 19.99},
-                "business": {"name": "Business Plan", "price": 49.99}
+            print("❌ Stripe service unavailable - using direct checkout links")
+            # Pre-configured Stripe Payment Links (replace with your actual links from Stripe Dashboard)
+            payment_links = {
+                "student": "https://buy.stripe.com/test_dR6aHo5W92HMdRS7ss",   # $4.99 CAD/month - Replace with your actual link
+                "growth": "https://buy.stripe.com/test_5kA5mU0Dp6Vo0dG5kk",   # $19.99 CAD/month - Replace with your actual link  
+                "business": "https://buy.stripe.com/test_6oE9CYcwxb5sb3O28b"  # $49.99 CAD/month - Replace with your actual link
             }
             
-            plan_config = plan_configs[request.plan_type.lower()]
+            # Get the pre-configured payment link for the requested plan
+            checkout_url = payment_links.get(request.plan_type.lower(), payment_links["student"])
             
-            # Create dynamic price for your account
-            try:
-                dynamic_price = stripe.Price.create(
-                    unit_amount=int(plan_config["price"] * 100),
-                    currency='cad',
-                    recurring={'interval': 'month'},
-                    product_data={'name': plan_config["name"]}
-                )
-                print(f"✅ FORCED: Created price {dynamic_price.id} for {plan_config['name']}")
-            except Exception as price_error:
-                print(f"❌ Price creation failed: {type(price_error).__name__}: {price_error}")
-                print(f"   Price error details: {getattr(price_error, 'user_message', 'No user message')}")
-                print(f"   Price error code: {getattr(price_error, 'code', 'No code')}")
-                print(f"   Price error type: {getattr(price_error, 'type', 'No type')}")
-                if hasattr(price_error, 'json_body'):
-                    print(f"   Price error body: {price_error.json_body}")
-                raise HTTPException(status_code=500, detail=f"STRIPE PRICE ERROR: {type(price_error).__name__}: {str(price_error)}")
+            print(f"✅ Using pre-configured payment link for {request.plan_type}: {checkout_url}")
             
-            # Create checkout session with YOUR account
-            try:
-                checkout_session = stripe.checkout.Session.create(
-                    payment_method_types=['card'],
-                    customer_email=request.customer_email,
-                    line_items=[{'price': dynamic_price.id, 'quantity': 1}],
-                    mode='subscription',
-                    success_url=request.success_url + '?session_id={CHECKOUT_SESSION_ID}',
-                    cancel_url=request.cancel_url,
-                    metadata={'plan_type': request.plan_type, 'plan_name': plan_config["name"]}
-                )
-                print(f"✅ FORCED: Created YOUR checkout session {checkout_session.id}")
-            except Exception as session_error:
-                print(f"❌ Checkout session creation failed: {type(session_error).__name__}: {session_error}")
-                print(f"   Session error details: {getattr(session_error, 'user_message', 'No user message')}")
-                print(f"   Session error code: {getattr(session_error, 'code', 'No code')}")
-                print(f"   Session error type: {getattr(session_error, 'type', 'No type')}")
-                if hasattr(session_error, 'json_body'):
-                    print(f"   Session error body: {session_error.json_body}")
-                raise HTTPException(status_code=500, detail=f"STRIPE SESSION ERROR: {type(session_error).__name__}: {str(session_error)}")
             return {
                 "success": True,
-                "checkout_url": checkout_session.url,
-                "session_id": checkout_session.id,
-                "forced_mode": True
-            }
-            
-        except Exception as e:
-            error_msg = str(e)
-            error_type = type(e).__name__
-            print(f"❌ FORCED initialization failed: {error_type}: {error_msg}")
-            
-            # Return detailed error in JSON for debugging
-            return {
-                "success": False,
-                "error": f"{error_type}: {error_msg}",
-                "error_type": error_type,
-                "error_details": error_msg,
-                "debug_info": {
-                    "api_key_present": bool(api_key),
-                    "api_key_starts_with": api_key[:15] if api_key else None,
-                    "api_key_length": len(api_key) if api_key else 0
-                }
+                "checkout_url": checkout_url,
+                "session_id": f"payment_link_{request.plan_type}_{int(time.time())}",
+                "payment_link_mode": True,
+                "message": f"Redirecting to {request.plan_type} plan checkout page"
             }
     
         try:
