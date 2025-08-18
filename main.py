@@ -1621,9 +1621,23 @@ def pricing_page():
                         console.log('🔥 CHECKOUT: Redirecting to:', data.checkout_url);
                         window.location.href = data.checkout_url;
                     } else {
+                        // Show detailed error information
                         var errorMsg = data.error || data.detail || 'Unknown error occurred';
-                        alert('❌ Checkout Error: ' + errorMsg);
-                        console.error('❌ CHECKOUT: Error:', data);
+                        var fullError = '❌ STRIPE ERROR DETAILS:\\n\\n';
+                        fullError += 'Error: ' + errorMsg + '\\n';
+                        if (data.error_type) fullError += 'Type: ' + data.error_type + '\\n';
+                        if (data.error_details) fullError += 'Details: ' + data.error_details + '\\n';
+                        if (data.debug_info) {
+                            fullError += '\\nDEBUG INFO:\\n';
+                            fullError += 'API Key Present: ' + data.debug_info.api_key_present + '\\n';
+                            fullError += 'API Key Length: ' + data.debug_info.api_key_length + '\\n';
+                            if (data.debug_info.api_key_starts_with) {
+                                fullError += 'API Key Starts: ' + data.debug_info.api_key_starts_with + '\\n';
+                            }
+                        }
+                        
+                        alert(fullError);
+                        console.error('❌ CHECKOUT: Full error details:', data);
                     }
                 })
                 .catch(function(error) {
@@ -2184,8 +2198,22 @@ async def create_checkout_session(request: CheckoutRequest):
             }
             
         except Exception as e:
-            print(f"❌ FORCED initialization failed: {e}")
-            raise HTTPException(status_code=500, detail=f"Stripe setup failed: {str(e)}")
+            error_msg = str(e)
+            error_type = type(e).__name__
+            print(f"❌ FORCED initialization failed: {error_type}: {error_msg}")
+            
+            # Return detailed error in JSON for debugging
+            return {
+                "success": False,
+                "error": f"{error_type}: {error_msg}",
+                "error_type": error_type,
+                "error_details": error_msg,
+                "debug_info": {
+                    "api_key_present": bool(api_key),
+                    "api_key_starts_with": api_key[:15] if api_key else None,
+                    "api_key_length": len(api_key) if api_key else 0
+                }
+            }
     
     try:
         # Validate plan type
