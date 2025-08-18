@@ -175,7 +175,7 @@ def home():
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <style>
-            :root {{
+            :root {
                 --primary-color: #2563eb;
                 --primary-hover: #1d4ed8;
                 --secondary-color: #6b7280;
@@ -194,24 +194,24 @@ def home():
                 --border-radius: 8px;
                 --border-radius-lg: 12px;
                 --transition: all 0.2s ease-in-out;
-            }}
+            }
             
-            * {{
+            * {
                 margin: 0;
                 padding: 0;
                 box-sizing: border-box;
-            }}
+            }
             
-            body {{
+            body {
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
                 line-height: 1.6;
                 color: var(--text-primary);
                 background: var(--background);
                 min-height: 100vh;
-            }}
+            }
             
             /* Navigation */
-            .navbar {{
+            .navbar {
                 position: sticky;
                 top: 0;
                 z-index: 1000;
@@ -219,18 +219,18 @@ def home():
                 border-bottom: 1px solid var(--border-color);
                 padding: 1rem 0;
                 box-shadow: var(--shadow-sm);
-            }}
+            }
             
-            .nav-container {{
+            .nav-container {
                 max-width: 1200px;
                 margin: 0 auto;
                 padding: 0 2rem;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-            }}
+            }
             
-            .logo {{
+            .logo {
                 font-size: 1.5rem;
                 font-weight: 700;
                 color: var(--text-primary);
@@ -238,35 +238,35 @@ def home():
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
-            }}
+            }
             
-            .logo i {{
+            .logo i {
                 font-size: 1.5rem;
                 color: var(--primary-color);
-            }}
+            }
             
-            .nav-links {{
+            .nav-links {
                 display: flex;
                 gap: 2rem;
                 list-style: none;
                 align-items: center;
-            }}
+            }
             
-            .nav-links a {{
+            .nav-links a {
                 color: var(--text-secondary);
                 text-decoration: none;
                 font-weight: 500;
                 padding: 0.5rem 1rem;
                 border-radius: var(--border-radius);
                 transition: var(--transition);
-            }}
+            }
             
-            .nav-links a:hover {{
+            .nav-links a:hover {
                 color: var(--text-primary);
                 background: var(--background-secondary);
-            }}
+            }
             
-            .cta-button {{
+            .cta-button {
                 background: var(--primary-color);
                 color: white;
                 padding: 0.75rem 1.5rem;
@@ -275,34 +275,34 @@ def home():
                 font-weight: 600;
                 transition: var(--transition);
                 box-shadow: var(--shadow-sm);
-            }}
+            }
             
-            .cta-button:hover {{
+            .cta-button:hover {
                 background: var(--primary-hover);
                 box-shadow: var(--shadow-md);
-            }}
+            }
             
             /* Main Content */
-            .main-content {{
+            .main-content {
                 max-width: 1200px;
                 margin: 0 auto;
                 padding: 3rem 2rem;
-            }}
+            }
             
-            .hero-section {{
+            .hero-section {
                 text-align: center;
                 margin-bottom: 4rem;
-            }}
+            }
             
-            .hero-section h1 {{
+            .hero-section h1 {
                 font-size: clamp(2.5rem, 5vw, 3.5rem);
                 font-weight: 700;
                 color: var(--text-primary);
                 margin-bottom: 1rem;
                 line-height: 1.2;
-            }}
+            }
             
-            .hero-section .subtitle {{
+            .hero-section .subtitle {
                 font-size: 1.125rem;
                 color: var(--text-secondary);
                 margin-bottom: 2rem;
@@ -310,17 +310,17 @@ def home():
                 margin-left: auto;
                 margin-right: auto;
                 line-height: 1.6;
-            }}
+            }
             
-            .features-row {{
+            .features-row {
                 display: flex;
                 justify-content: center;
                 gap: 2rem;
                 margin-bottom: 3rem;
                 flex-wrap: wrap;
-            }}
+            }
             
-            .feature-badge {{
+            .feature-badge {
                 background: var(--background-secondary);
                 color: var(--text-secondary);
                 padding: 0.5rem 1rem;
@@ -330,14 +330,14 @@ def home():
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
-            }}
+            }
             
-            .feature-badge i {{
+            .feature-badge i {
                 color: var(--success-color);
-            }}
+            }
             
             /* Upload Section */
-            .upload-container {{
+            .upload-container {
                 background: var(--background);
                 border: 2px solid var(--border-color);
                 border-radius: var(--border-radius-lg);
@@ -345,9 +345,9 @@ def home():
                 margin: 2rem auto;
                 max-width: 800px;
                 box-shadow: var(--shadow-md);
-            }}
+            }
             
-            .upload-area {{
+            .upload-area {
                 border: 2px dashed var(--border-color);
                 padding: 3rem 2rem;
                 text-align: center;
@@ -355,33 +355,33 @@ def home():
                 background: var(--background-secondary);
                 transition: var(--transition);
                 cursor: pointer;
-            }}
+            }
             
-            .upload-area:hover {{
+            .upload-area:hover {
                 border-color: var(--primary-color);
                 background: var(--background-tertiary);
-            }}
+            }
             
-            .upload-icon {{
+            .upload-icon {
                 font-size: 3rem;
                 margin-bottom: 1rem;
                 color: var(--text-muted);
-            }}
+            }
             
-            .upload-area h3 {{
+            .upload-area h3 {
                 font-size: 1.25rem;
                 margin-bottom: 0.5rem;
                 color: var(--text-primary);
                 font-weight: 600;
-            }}
+            }
             
-            .upload-area p {{
+            .upload-area p {
                 color: var(--text-secondary);
                 margin-bottom: 1rem;
                 font-size: 0.875rem;
-            }}
+            }
             
-            .btn-primary {{
+            .btn-primary {
                 background: var(--primary-color);
                 color: white;
                 padding: 0.75rem 1.5rem;
@@ -396,14 +396,14 @@ def home():
                 display: inline-flex;
                 align-items: center;
                 gap: 0.5rem;
-            }}
+            }
             
-            .btn-primary:hover {{
+            .btn-primary:hover {
                 background: var(--primary-hover);
                 box-shadow: var(--shadow-md);
-            }}
+            }
             
-            .btn-secondary {{
+            .btn-secondary {
                 background: var(--background);
                 color: var(--text-primary);
                 padding: 0.75rem 1.5rem;
@@ -417,26 +417,26 @@ def home():
                 display: inline-flex;
                 align-items: center;
                 gap: 0.5rem;
-            }}
+            }
             
-            .btn-secondary:hover {{
+            .btn-secondary:hover {
                 background: var(--background-secondary);
                 border-color: var(--border-hover);
-            }}
+            }
             
             /* Loading and Results */
-            .loading {{
+            .loading {
                 display: none;
                 text-align: center;
                 padding: 2rem;
                 color: var(--text-secondary);
-            }}
+            }
             
-            .loading.active {{
+            .loading.active {
                 display: block;
-            }}
+            }
             
-            .spinner {{
+            .spinner {
                 border: 3px solid var(--border-color);
                 border-radius: 50%;
                 border-top: 3px solid var(--primary-color);
@@ -444,52 +444,52 @@ def home():
                 height: 40px;
                 animation: spin 1s linear infinite;
                 margin: 0 auto 1rem;
-            }}
+            }
             
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
             
-            .results {{
+            .results {
                 background: var(--background-secondary);
                 border: 1px solid var(--border-color);
                 border-radius: var(--border-radius);
                 padding: 1.5rem;
                 margin-top: 2rem;
                 display: none;
-            }}
+            }
             
-            .results.active {{
+            .results.active {
                 display: block;
                 animation: slideIn 0.3s ease-out;
-            }}
+            }
             
-            @keyframes slideIn {{
-                from {{
+            @keyframes slideIn {
+                from {
                     opacity: 0;
                     transform: translateY(10px);
-                }}
-                to {{
+                }
+                to {
                     opacity: 1;
                     transform: translateY(0);
-                }}
-            }}
+                }
+            }
             
-            .results h3 {{
+            .results h3 {
                 color: var(--text-primary);
                 margin-bottom: 1rem;
                 font-weight: 600;
                 display: flex;
                 align-items: center;
                 gap: 0.5rem;
-            }}
+            }
             
-            .results h3 i {{
+            .results h3 i {
                 color: var(--success-color);
-            }}
+            }
             
-            .results-content {{
+            .results-content {
                 background: var(--background);
                 border: 1px solid var(--border-color);
                 padding: 1rem;
@@ -500,59 +500,59 @@ def home():
                 white-space: pre-wrap;
                 max-height: 400px;
                 overflow-y: auto;
-            }}
+            }
             
             /* Responsive Design */
-            @media (max-width: 768px) {{
-                .nav-container {{
+            @media (max-width: 768px) {
+                .nav-container {
                     padding: 0 1rem;
-                }}
+                }
                 
-                .nav-links {{
+                .nav-links {
                     display: none;
-                }}
+                }
                 
-                .main-content {{
+                .main-content {
                     padding: 2rem 1rem;
-                }}
+                }
                 
-                .hero-section h1 {{
+                .hero-section h1 {
                     font-size: 2rem;
-                }}
+                }
                 
-                .features-row {{
+                .features-row {
                     flex-direction: column;
                     align-items: center;
-                }}
+                }
                 
-                .upload-container {{
+                .upload-container {
                     margin: 1rem;
                     padding: 1.5rem;
-                }}
-            }}
+                }
+            }
             
             /* Utility Classes */
-            .text-center {{
+            .text-center {
                 text-align: center;
-            }}
+            }
             
-            .mb-4 {{
+            .mb-4 {
                 margin-bottom: 2rem;
-            }}
+            }
             
-            .hidden {{
+            .hidden {
                 display: none;
-            }}
+            }
             
             /* Enhanced Login Section */
-            .login-container {{
+            .login-container {
                 margin-top: 3rem;
                 display: flex;
                 justify-content: center;
                 padding: 0 1rem;
-            }}
+            }
             
-            .login-card {{
+            .login-card {
                 background: var(--background);
                 border: 1px solid var(--border-color);
                 border-radius: var(--border-radius-lg);
@@ -561,53 +561,53 @@ def home():
                 width: 100%;
                 box-shadow: var(--shadow-lg);
                 transition: var(--transition);
-            }}
+            }
             
-            .login-card:hover {{
+            .login-card:hover {
                 box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
-            }}
+            }
             
-            .login-header {{
+            .login-header {
                 text-align: center;
                 margin-bottom: 2rem;
-            }}
+            }
             
-            .login-header i {{
+            .login-header i {
                 font-size: 3rem;
                 color: var(--primary-color);
                 margin-bottom: 1rem;
                 display: block;
-            }}
+            }
             
-            .login-header h3 {{
+            .login-header h3 {
                 font-size: 1.5rem;
                 font-weight: 600;
                 color: var(--text-primary);
                 margin-bottom: 0.5rem;
-            }}
+            }
             
-            .login-header p {{
+            .login-header p {
                 color: var(--text-secondary);
                 font-size: 0.875rem;
-            }}
+            }
             
-            .login-form {{
+            .login-form {
                 margin-bottom: 1.5rem;
-            }}
+            }
             
-            .form-group {{
+            .form-group {
                 margin-bottom: 1.5rem;
-            }}
+            }
             
-            .form-group label {{
+            .form-group label {
                 display: block;
                 margin-bottom: 0.5rem;
                 font-weight: 500;
                 color: var(--text-primary);
                 font-size: 0.875rem;
-            }}
+            }
             
-            .form-group input {{
+            .form-group input {
                 width: 100%;
                 padding: 0.75rem 1rem;
                 border: 2px solid var(--border-color);
@@ -615,19 +615,19 @@ def home():
                 font-size: 1rem;
                 transition: var(--transition);
                 background: var(--background);
-            }}
+            }
             
-            .form-group input:focus {{
+            .form-group input:focus {
                 outline: none;
                 border-color: var(--primary-color);
                 box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
-            }}
+            }
             
-            .form-group input:hover {{
+            .form-group input:hover {
                 border-color: var(--border-hover);
-            }}
+            }
             
-            .error-message {{
+            .error-message {
                 background: #fef2f2;
                 border: 1px solid #fecaca;
                 color: #dc2626;
@@ -639,15 +639,15 @@ def home():
                 gap: 0.5rem;
                 font-size: 0.875rem;
                 animation: shake 0.5s ease-in-out;
-            }}
+            }
             
-            @keyframes shake {{
-                0%, 100% {{ transform: translateX(0); }}
-                25% {{ transform: translateX(-5px); }}
-                75% {{ transform: translateX(5px); }}
-            }}
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-5px); }
+                75% { transform: translateX(5px); }
+            }
             
-            .login-btn {{
+            .login-btn {
                 width: 100%;
                 background: var(--primary-color);
                 color: white;
@@ -662,31 +662,31 @@ def home():
                 align-items: center;
                 justify-content: center;
                 gap: 0.5rem;
-            }}
+            }
             
-            .login-btn:hover {{
+            .login-btn:hover {
                 background: var(--primary-hover);
                 transform: translateY(-1px);
                 box-shadow: var(--shadow-md);
-            }}
+            }
             
-            .login-btn:active {{
+            .login-btn:active {
                 transform: translateY(0);
-            }}
+            }
             
-            .login-footer {{
+            .login-footer {
                 text-align: center;
                 padding-top: 1.5rem;
                 border-top: 1px solid var(--border-color);
-            }}
+            }
             
-            .login-footer p {{
+            .login-footer p {
                 color: var(--text-secondary);
                 font-size: 0.875rem;
                 margin-bottom: 1rem;
-            }}
+            }
             
-            .signup-link {{
+            .signup-link {
                 display: inline-flex;
                 align-items: center;
                 gap: 0.5rem;
@@ -697,12 +697,12 @@ def home():
                 padding: 0.5rem 1rem;
                 border-radius: var(--border-radius);
                 transition: var(--transition);
-            }}
+            }
             
-            .signup-link:hover {{
+            .signup-link:hover {
                 background: var(--background-secondary);
                 transform: translateY(-1px);
-            }}
+            }
         </style>
     </head>
     <body>
