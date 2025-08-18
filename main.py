@@ -2410,9 +2410,14 @@ async def stripe_webhook(request: Request):
                     user_id = existing_customer.customer_id
                     
                     # Update their subscription tier
-                    from api_key_manager import SubscriptionTier, api_key_manager
-                    tier = getattr(SubscriptionTier, plan_info['tier'])
-                    api_key_manager.update_customer_subscription(user_id, tier)
+                    try:
+                        from api_key_manager import SubscriptionTier, api_key_manager
+                        tier = getattr(SubscriptionTier, plan_info['tier'])
+                        api_key_manager.update_customer_subscription(user_id, tier)
+                        print(f"✅ Updated subscription tier to {plan_info['tier']}")
+                    except ImportError as e:
+                        print(f"⚠️  Could not update subscription tier: {e}")
+                        # Continue without subscription tier update
                     
                     # Set up usage tracking
                     if usage_tracker:

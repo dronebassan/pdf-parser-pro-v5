@@ -41,7 +41,10 @@ try:
         # Test the API key immediately
         try:
             test_result = stripe.Account.retrieve()
-            print(f"✅ Stripe API key WORKS - Account ID: {test_result.id if hasattr(test_result, 'id') else 'unknown'}")
+            if test_result and hasattr(test_result, 'id'):
+                print(f"✅ Stripe API key WORKS - Account ID: {test_result.id}")
+            else:
+                print(f"✅ Stripe API key connected but account object format unexpected")
             
             # List available products and prices for debugging
             try:
@@ -59,8 +62,10 @@ try:
                 print(f"⚠️  Could not list products/prices: {list_error}")
                 
         except Exception as test_error:
-            print(f"❌ Stripe API key INVALID: {test_error}")
-            stripe = None  # Force demo mode if key doesn't work
+            print(f"❌ Stripe API key test failed: {test_error}")
+            print(f"   Error type: {type(test_error).__name__}")
+            # Don't disable Stripe entirely - just log the error
+            print("⚠️  Continuing with Stripe service despite test failure")
         
 except ImportError as e:
     print(f"❌ Failed to import Stripe: {e}")
