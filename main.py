@@ -19,6 +19,12 @@ app = FastAPI(
     version="2.0.1-js-fixed"
 )
 
+# Add healthcheck endpoint for Railway
+@app.get("/health")
+async def health_check():
+    """Railway healthcheck endpoint"""
+    return {"status": "healthy", "timestamp": time.time()}
+
 # Mount static files
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
