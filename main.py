@@ -1469,6 +1469,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
                     <button onclick="createCheckout('student', this)" class="plan-button secondary">Get Started</button>
+                    <button onclick="testButton('student')" style="width: 100%; margin-top: 0.5rem; padding: 0.5rem; background: #orange; color: white; border: none; border-radius: 4px;">🔥 TEST BUTTON</button>
                 </div>
 
                 <div class="pricing-card popular">
@@ -1536,9 +1537,27 @@ def pricing_page():
         </main>
         
         <script>
+            // Test function first
+            async function testButton(planType) {{
+                console.log('🔥 TEST: Button clicked for plan:', planType);
+                alert('Button is working! Plan: ' + planType);
+                
+                try {{
+                    const response = await fetch('/test-button/', {{
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        body: JSON.stringify({{plan: planType, test: true}})
+                    }});
+                    const result = await response.json();
+                    console.log('🔥 TEST: Server response:', result);
+                }} catch (error) {{
+                    console.error('🔥 TEST: Error:', error);
+                }}
+            }}
+            
             // Stripe Checkout Integration
             async function createCheckout(planType, buttonElement) {{
-                console.log('createCheckout called with:', planType);
+                console.log('🔥 createCheckout called with:', planType);
                 
                 const button = buttonElement || event.target;
                 const originalText = button.textContent;
@@ -1724,10 +1743,19 @@ def health_check():
             "smart_parser": smart_parser is not None,
             "ocr_service": ocr_service is not None,
             "llm_service": llm_service is not None,
-            "performance_tracker": performance_tracker is not None
+            "performance_tracker": performance_tracker is not None,
+            "stripe_service": stripe_service is not None,
+            "auth_system": auth_system is not None
         },
-        "environment": os.getenv("ENVIRONMENT", "development")
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "stripe_configured": os.getenv("STRIPE_SECRET_KEY") is not None
     }
+
+@app.post("/test-button/")
+async def test_button(request: dict):
+    """Simple test endpoint to debug button clicks"""
+    print(f"🔥 Test button clicked: {request}")
+    return {"success": True, "message": "Button click received!", "data": request}
 
 @app.post("/parse/")
 async def parse_pdf_advanced(
@@ -1998,15 +2026,24 @@ def get_pricing():
 @app.post("/create-checkout-session/")
 async def create_checkout_session(request: CheckoutRequest):
     """Create Stripe checkout session for subscription"""
+    
+    # Debug logging
+    print(f"🔥 Checkout request received: {request}")
+    print(f"🔥 Stripe service status: {stripe_service is not None}")
+    
     if not stripe_service:
-        raise HTTPException(status_code=503, detail="Billing service unavailable")
+        print("❌ Stripe service is None - check environment variables")
+        raise HTTPException(status_code=503, detail="Billing service unavailable - check Stripe configuration")
     
     try:
         # Validate plan type
         plan_type = PlanType(request.plan_type.lower())
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid plan type")
+        print(f"🔥 Plan type validated: {plan_type}")
+    except ValueError as e:
+        print(f"❌ Invalid plan type: {request.plan_type}")
+        raise HTTPException(status_code=400, detail=f"Invalid plan type: {request.plan_type}")
     
+    print(f"🔥 Creating checkout session for {plan_type}")
     result = stripe_service.create_checkout_session(
         plan_type=plan_type,
         customer_email=request.customer_email,
@@ -2014,7 +2051,10 @@ async def create_checkout_session(request: CheckoutRequest):
         cancel_url=request.cancel_url
     )
     
+    print(f"🔥 Checkout result: {result}")
+    
     if not result["success"]:
+        print(f"❌ Checkout failed: {result['error']}")
         raise HTTPException(status_code=400, detail=result["error"])
     
     return result
