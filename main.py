@@ -1579,7 +1579,7 @@ def pricing_page():
                         body: JSON.stringify({{
                             plan_type: planType,
                             customer_email: '', // Will be collected by Stripe
-                            success_url: window.location.origin + '/success?session_id={{CHECKOUT_SESSION_ID}}',
+                            success_url: window.location.origin + '/success?session_id=' + '{' + 'CHECKOUT_SESSION_ID' + '}',
                             cancel_url: window.location.origin + '/pricing'
                         }})
                     }});
