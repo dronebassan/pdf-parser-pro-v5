@@ -2393,36 +2393,198 @@ async def customer_portal(customer_id: str, return_url: str = "https://your-doma
 
 @app.post("/stripe-webhook/")
 async def stripe_webhook(request: Request):
-    """Handle Stripe webhooks"""
-    if not stripe_service:
-        raise HTTPException(status_code=503, detail="Billing service unavailable")
+    """Handle Stripe webhooks for Payment Link subscriptions"""
+    import stripe
+    import json
     
     payload = await request.body()
     sig_header = request.headers.get('stripe-signature')
-    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
     
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, endpoint_secret
-        )
+        # Verify webhook signature if secret is set
+        if endpoint_secret:
+            event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        else:
+            # For development - skip signature verification
+            event = json.loads(payload)
+            print("⚠️  Webhook signature verification skipped - set STRIPE_WEBHOOK_SECRET for production")
+            
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
     
-    # Handle the event
-    result = stripe_service.handle_webhook_event(event)
+    print(f"📨 Received webhook: {event['type']}")
     
-    if not result["success"]:
-        print(f"Webhook handling error: {result['error']}")
+    # Handle checkout completion (Payment Link payments)
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        print(f"💳 Payment completed: {session['id']}")
+        
+        try:
+            # Get customer info from Stripe
+            customer_id = session['customer']
+            customer = stripe.Customer.retrieve(customer_id)
+            customer_email = customer['email']
+            
+            # Get subscription info
+            subscription_id = session['subscription']
+            subscription = stripe.Subscription.retrieve(subscription_id)
+            
+            # Determine plan type from price ID
+            price_id = subscription['items']['data'][0]['price']['id']
+            plan_map = {
+                "price_1RxLhYCVZzvkFjSrXR0pCSoO": {"plan": "student", "pages": 500, "tier": "STUDENT"},
+                "price_1RxLjPCVZzvkFjSr8Fm6xVAj": {"plan": "growth", "pages": 2500, "tier": "GROWTH"}, 
+                "price_1RxLk5CVZzvkFjSrSfrJfv0S": {"plan": "business", "pages": 10000, "tier": "BUSINESS"}
+            }
+            
+            plan_info = plan_map.get(price_id, {"plan": "student", "pages": 500, "tier": "STUDENT"})
+            
+            print(f"👤 Creating account for: {customer_email} ({plan_info['plan']} plan)")
+            
+            # Create user account if auth system is available
+            if auth_system:
+                try:
+                    # Check if user already exists
+                    existing_customer = auth_system.get_customer_by_email(customer_email)
+                    
+                    if not existing_customer:
+                        # Import subscription tier
+                        from api_key_manager import SubscriptionTier
+                        tier = getattr(SubscriptionTier, plan_info['tier'])
+                        
+                        # Create new customer account
+                        new_customer = auth_system.create_customer(
+                            email=customer_email,
+                            subscription_tier=tier
+                        )
+                        
+                        print(f"✅ Created user account: {new_customer.customer_id}")
+                        user_id = new_customer.customer_id
+                    else:
+                        print(f"✅ Updated existing user: {existing_customer.customer_id}")  
+                        user_id = existing_customer.customer_id
+                        
+                        # Update their subscription tier
+                        from api_key_manager import SubscriptionTier, api_key_manager
+                        tier = getattr(SubscriptionTier, plan_info['tier'])
+                        api_key_manager.update_customer_subscription(user_id, tier)
+                    
+                    # Set up usage tracking
+                    if usage_tracker:
+                        from datetime import datetime, timedelta
+                        cycle_start = datetime.now()
+                        cycle_end = cycle_start + timedelta(days=30)
+                        
+                        usage_tracker.update_user_limits(
+                            user_id=user_id,
+                            subscription_id=subscription_id,
+                            plan_type=plan_info['plan'],
+                            pages_included=plan_info['pages'],
+                            overage_rate=0.01,  # $0.01 per page over limit
+                            billing_cycle_start=cycle_start,
+                            billing_cycle_end=cycle_end
+                        )
+                        
+                        print(f"✅ Set up usage tracking: {plan_info['pages']} pages/month")
+                    
+                    return {"status": "success", "action": "account_created"}
+                    
+                except Exception as e:
+                    print(f"❌ Error creating account: {e}")
+                    return {"status": "error", "error": str(e)}
+            else:
+                print("❌ Auth system not available")
+                return {"status": "error", "error": "Auth system unavailable"}
+                
+        except Exception as e:
+            print(f"❌ Webhook processing error: {e}")
+            return {"status": "error", "error": str(e)}
     
-    return {"status": "success"}
+    # Handle subscription updates
+    elif event['type'] == 'customer.subscription.updated':
+        print(f"🔄 Subscription updated: {event['data']['object']['id']}")
+        return {"status": "success", "action": "subscription_updated"}
+    
+    # Handle subscription cancellations
+    elif event['type'] == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        print(f"❌ Subscription cancelled: {subscription['id']}")
+        
+        # Downgrade user to free tier
+        try:
+            customer = stripe.Customer.retrieve(subscription['customer'])
+            customer_email = customer['email']
+            
+            if auth_system:
+                existing_customer = auth_system.get_customer_by_email(customer_email)
+                if existing_customer:
+                    from api_key_manager import SubscriptionTier, api_key_manager
+                    api_key_manager.downgrade_customer_to_free(existing_customer.customer_id)
+                    print(f"✅ Downgraded {customer_email} to free tier")
+        except Exception as e:
+            print(f"❌ Error handling cancellation: {e}")
+        
+        return {"status": "success", "action": "subscription_cancelled"}
+    
+    print(f"ℹ️  Unhandled webhook type: {event['type']}")
+    return {"status": "success", "action": "ignored"}
 
 # ==================== USAGE TRACKING ENDPOINTS ====================
 
+@app.get("/dashboard")
+async def user_dashboard(current_user = Depends(get_current_user)):
+    """Get user dashboard with usage, billing, and account info"""
+    
+    try:
+        dashboard_data = {
+            "user": {
+                "customer_id": current_user.customer_id,
+                "email": current_user.email,
+                "subscription_tier": current_user.subscription_tier.value,
+                "api_key": current_user.api_key
+            },
+            "subscription": {
+                "tier": current_user.subscription_tier.value,
+                "status": "active"  # You can enhance this with Stripe subscription status
+            },
+            "usage": {
+                "pages_used": 0,
+                "pages_included": 10,
+                "overage_cost": 0.0,
+                "billing_cycle_end": None
+            }
+        }
+        
+        # Get usage info if tracker is available
+        if usage_tracker:
+            usage_info = usage_tracker.check_user_limits(current_user.customer_id, 0)
+            monthly_usage = usage_tracker.get_monthly_usage(current_user.customer_id)
+            
+            if usage_info.get("success", False):
+                dashboard_data["usage"] = {
+                    "pages_used": usage_info.get("current_usage", 0),
+                    "pages_included": usage_info.get("pages_included", 10),
+                    "pages_remaining": max(0, usage_info.get("pages_included", 10) - usage_info.get("current_usage", 0)),
+                    "overage_pages": usage_info.get("overage_pages", 0),
+                    "overage_cost": usage_info.get("overage_cost", 0.0),
+                    "billing_cycle_end": usage_info.get("billing_cycle_end"),
+                    "plan_type": usage_info.get("plan_type", "free")
+                }
+        
+        return {
+            "success": True,
+            "dashboard": dashboard_data
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/usage/{user_id}")
 async def get_user_usage(user_id: str):
-    """Get user's current usage and limits"""
+    """Get user's current usage and limits (admin endpoint)"""
     if not usage_tracker:
         raise HTTPException(status_code=503, detail="Usage tracking unavailable")
     
