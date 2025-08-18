@@ -2170,26 +2170,43 @@ async def create_checkout_session(request: CheckoutRequest):
             plan_config = plan_configs[request.plan_type.lower()]
             
             # Create dynamic price for your account
-            dynamic_price = stripe.Price.create(
-                unit_amount=int(plan_config["price"] * 100),
-                currency='cad',
-                recurring={'interval': 'month'},
-                product_data={'name': plan_config["name"]}
-            )
-            print(f"✅ FORCED: Created price {dynamic_price.id} for {plan_config['name']}")
+            try:
+                dynamic_price = stripe.Price.create(
+                    unit_amount=int(plan_config["price"] * 100),
+                    currency='cad',
+                    recurring={'interval': 'month'},
+                    product_data={'name': plan_config["name"]}
+                )
+                print(f"✅ FORCED: Created price {dynamic_price.id} for {plan_config['name']}")
+            except Exception as price_error:
+                print(f"❌ Price creation failed: {type(price_error).__name__}: {price_error}")
+                print(f"   Price error details: {getattr(price_error, 'user_message', 'No user message')}")
+                print(f"   Price error code: {getattr(price_error, 'code', 'No code')}")
+                print(f"   Price error type: {getattr(price_error, 'type', 'No type')}")
+                if hasattr(price_error, 'json_body'):
+                    print(f"   Price error body: {price_error.json_body}")
+                raise HTTPException(status_code=500, detail=f"STRIPE PRICE ERROR: {type(price_error).__name__}: {str(price_error)}")
             
             # Create checkout session with YOUR account
-            checkout_session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                customer_email=request.customer_email,
-                line_items=[{'price': dynamic_price.id, 'quantity': 1}],
-                mode='subscription',
-                success_url=request.success_url + '?session_id={CHECKOUT_SESSION_ID}',
-                cancel_url=request.cancel_url,
-                metadata={'plan_type': request.plan_type, 'plan_name': plan_config["name"]}
-            )
-            
-            print(f"✅ FORCED: Created YOUR checkout session {checkout_session.id}")
+            try:
+                checkout_session = stripe.checkout.Session.create(
+                    payment_method_types=['card'],
+                    customer_email=request.customer_email,
+                    line_items=[{'price': dynamic_price.id, 'quantity': 1}],
+                    mode='subscription',
+                    success_url=request.success_url + '?session_id={CHECKOUT_SESSION_ID}',
+                    cancel_url=request.cancel_url,
+                    metadata={'plan_type': request.plan_type, 'plan_name': plan_config["name"]}
+                )
+                print(f"✅ FORCED: Created YOUR checkout session {checkout_session.id}")
+            except Exception as session_error:
+                print(f"❌ Checkout session creation failed: {type(session_error).__name__}: {session_error}")
+                print(f"   Session error details: {getattr(session_error, 'user_message', 'No user message')}")
+                print(f"   Session error code: {getattr(session_error, 'code', 'No code')}")
+                print(f"   Session error type: {getattr(session_error, 'type', 'No type')}")
+                if hasattr(session_error, 'json_body'):
+                    print(f"   Session error body: {session_error.json_body}")
+                raise HTTPException(status_code=500, detail=f"STRIPE SESSION ERROR: {type(session_error).__name__}: {str(session_error)}")
             return {
                 "success": True,
                 "checkout_url": checkout_session.url,
