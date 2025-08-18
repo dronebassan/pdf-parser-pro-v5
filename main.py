@@ -1747,6 +1747,15 @@ def pricing_page():
             function createCheckout(planType, buttonElement) {
                 console.log('🔥 CHECKOUT: Function called with planType:', planType);
                 
+                // Check if user is logged in first
+                var token = localStorage.getItem('token');
+                if (!token) {
+                    // User not logged in - redirect to register
+                    alert('Please create an account first to subscribe to a plan!');
+                    window.location.href = '/auth/register?plan=' + planType;
+                    return;
+                }
+                
                 // Get button element safely
                 var button = buttonElement;
                 if (!button) {
@@ -1761,12 +1770,12 @@ def pricing_page():
                 button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
                 button.disabled = true;
                 
-                console.log('🔥 CHECKOUT: Button loading state set');
+                console.log('🔥 CHECKOUT: Button loading state set, user is logged in');
                 
                 // Prepare checkout data
                 var checkoutData = {
                     plan_type: planType,
-                    customer_email: '',
+                    customer_email: '',  // Will be filled from JWT token
                     success_url: window.location.origin + '/success?session_id={CHECKOUT_SESSION_ID}',
                     cancel_url: window.location.origin + '/pricing'
                 };
@@ -1777,6 +1786,7 @@ def pricing_page():
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
                     },
                     body: JSON.stringify(checkoutData)
                 })
@@ -1791,23 +1801,17 @@ def pricing_page():
                         console.log('🔥 CHECKOUT: Redirecting to:', data.checkout_url);
                         window.location.href = data.checkout_url;
                     } else {
-                        // Show detailed error information
-                        var errorMsg = data.error || data.detail || 'Unknown error occurred';
-                        var fullError = '❌ STRIPE ERROR DETAILS:\\n\\n';
-                        fullError += 'Error: ' + errorMsg + '\\n';
-                        if (data.error_type) fullError += 'Type: ' + data.error_type + '\\n';
-                        if (data.error_details) fullError += 'Details: ' + data.error_details + '\\n';
-                        if (data.debug_info) {
-                            fullError += '\\nDEBUG INFO:\\n';
-                            fullError += 'API Key Present: ' + data.debug_info.api_key_present + '\\n';
-                            fullError += 'API Key Length: ' + data.debug_info.api_key_length + '\\n';
-                            if (data.debug_info.api_key_starts_with) {
-                                fullError += 'API Key Starts: ' + data.debug_info.api_key_starts_with + '\\n';
-                            }
+                        // Handle authentication errors
+                        if (data.detail && data.detail.error === 'Must create account first') {
+                            alert('Please create an account first to subscribe!');
+                            window.location.href = '/auth/register?plan=' + planType;
+                            return;
                         }
                         
-                        alert(fullError);
-                        console.error('❌ CHECKOUT: Full error details:', data);
+                        // Show other errors
+                        var errorMsg = data.error || data.detail || 'Unknown error occurred';
+                        alert('❌ Error: ' + errorMsg);
+                        console.error('❌ CHECKOUT: Error details:', data);
                     }
                 })
                 .catch(function(error) {
@@ -2283,100 +2287,45 @@ def get_pricing():
     }
 
 @app.post("/create-checkout-session/")
-async def create_checkout_session(request: CheckoutRequest):
-    """Create Stripe checkout session for subscription"""
+async def create_checkout_session(request: CheckoutRequest, current_user = Depends(get_current_user)):
+    """Create Stripe checkout session - REQUIRES USER TO BE LOGGED IN FIRST"""
     
-    try:
-        # Debug logging
-        print(f"🔥 Checkout request received: {request}")
-        print(f"🔥 Stripe service status: {stripe_service is not None}")
-        
-        # FUCK THE API - USE DIRECT PAYMENT LINKS THAT ACTUALLY WORK
-        print("✅ Using Stripe Payment Links - NO API BULLSHIT")
-        
-        # Create Payment Links with your price IDs
-        import stripe
-        api_key = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY")
-        stripe.api_key = api_key
-        
-        # Skip API completely - use direct pre-made Payment Links
-        print("✅ Using pre-made Payment Links - NO API NEEDED")
-        
-        # Your actual Payment Links from Stripe Dashboard
-        payment_links = {
-            "student": "https://buy.stripe.com/4gM14m11zaRk2ELcT6e3e04",    # Student Plan: $4.99 CAD/month
-            "growth": "https://buy.stripe.com/4gMeVcfWt4sW7Z5cT6e3e05",     # Growth Plan: $19.99 CAD/month
-            "business": "https://buy.stripe.com/eVq9AS25D3oS5QX2ese3e06"    # Business Plan: $49.99 CAD/month
-        }
-        
-        checkout_url = payment_links.get(request.plan_type.lower(), payment_links["student"])
-        
-        print(f"✅ Using Payment Link: {checkout_url}")
-        
-        return {
-            "success": True,
-            "checkout_url": checkout_url,
-            "session_id": f"link_{request.plan_type}_{int(time.time())}",
-            "direct_link": True
-        }
+    print(f"🔥 Checkout request from user: {current_user.email}")
     
-        try:
-            # Validate plan type
-            plan_type = PlanType(request.plan_type.lower())
-            print(f"🔥 Plan type validated: {plan_type}")
-        except ValueError as e:
-            print(f"❌ Invalid plan type: {request.plan_type}")
-            raise HTTPException(status_code=400, detail=f"Invalid plan type: {request.plan_type}")
-        
-        print(f"🔥 Creating checkout session for {plan_type}")
-        result = stripe_service.create_checkout_session(
-            plan_type=plan_type,
-            customer_email=request.customer_email,
-            success_url=request.success_url,
-            cancel_url=request.cancel_url
-        )
-        
-        print(f"🔥 Checkout result: {result}")
-        
-        if not result["success"]:
-            print(f"❌ Checkout failed: {result['error']}")
-            raise HTTPException(status_code=400, detail=result["error"])
-        
-        return result
-    
-    except Exception as outer_error:
-        # Comprehensive error catching for ANY error in the entire function
-        error_msg = str(outer_error)
-        error_type = type(outer_error).__name__
-        print(f"❌ CHECKOUT ENDPOINT ERROR: {error_type}: {error_msg}")
-        
-        # Extract detailed error information for all types of errors
-        error_details = {
-            "error_type": error_type,
-            "error_message": error_msg,
-            "api_key_present": bool(os.getenv("STRIPE_SECRET_KEY")),
-            "api_key_length": len(os.getenv("STRIPE_SECRET_KEY", "")),
-            "api_key_starts": (os.getenv("STRIPE_SECRET_KEY") or "")[:15]
-        }
-        
-        # Special handling for Stripe errors
-        if hasattr(outer_error, 'user_message'):
-            error_details["stripe_user_message"] = outer_error.user_message
-        if hasattr(outer_error, 'code'):
-            error_details["stripe_code"] = outer_error.code
-        if hasattr(outer_error, 'type'):
-            error_details["stripe_type"] = outer_error.type
-        if hasattr(outer_error, 'json_body'):
-            error_details["stripe_json_body"] = outer_error.json_body
-            
-        # Log all details
-        print(f"🔍 Error details: {error_details}")
-        
-        # Return detailed error for debugging
+    # User must be logged in to pay
+    if not current_user:
         raise HTTPException(
-            status_code=500, 
-            detail=f"CHECKOUT ERROR: {error_type}: {error_msg} | Details: {error_details}"
+            status_code=401, 
+            detail={
+                "error": "Must create account first",
+                "message": "Please create an account to subscribe to a plan",
+                "register_url": "/auth/register"
+            }
         )
+    
+    # Your actual Payment Links from Stripe Dashboard  
+    payment_links = {
+        "student": "https://buy.stripe.com/4gM14m11zaRk2ELcT6e3e04",    # Student Plan: $4.99 CAD/month
+        "growth": "https://buy.stripe.com/4gMeVcfWt4sW7Z5cT6e3e05",     # Growth Plan: $19.99 CAD/month
+        "business": "https://buy.stripe.com/eVq9AS25D3oS5QX2ese3e06"    # Business Plan: $49.99 CAD/month
+    }
+    
+    checkout_url = payment_links.get(request.plan_type.lower(), payment_links["student"])
+    
+    # Add user email as URL parameter so Stripe can pre-fill it
+    if "?" in checkout_url:
+        checkout_url += f"&prefilled_email={current_user.email}"
+    else:
+        checkout_url += f"?prefilled_email={current_user.email}"
+    
+    print(f"✅ Sending logged-in user {current_user.email} to: {checkout_url}")
+    
+    return {
+        "success": True,
+        "checkout_url": checkout_url,
+        "session_id": f"user_{current_user.customer_id}_{request.plan_type}_{int(time.time())}",
+        "user_email": current_user.email,
+        "requires_login": False
 
 @app.post("/customer-portal/")
 async def customer_portal(customer_id: str, return_url: str = "https://your-domain.com"):
@@ -2444,33 +2393,26 @@ async def stripe_webhook(request: Request):
             
             print(f"👤 Creating account for: {customer_email} ({plan_info['plan']} plan)")
             
-            # Create user account if auth system is available
+            # Upgrade existing user account (user must register first)
             if auth_system:
                 try:
-                    # Check if user already exists
+                    # User MUST already exist (they registered before paying)
                     existing_customer = auth_system.get_customer_by_email(customer_email)
                     
                     if not existing_customer:
-                        # Import subscription tier
-                        from api_key_manager import SubscriptionTier
-                        tier = getattr(SubscriptionTier, plan_info['tier'])
-                        
-                        # Create new customer account
-                        new_customer = auth_system.create_customer(
-                            email=customer_email,
-                            subscription_tier=tier
-                        )
-                        
-                        print(f"✅ Created user account: {new_customer.customer_id}")
-                        user_id = new_customer.customer_id
-                    else:
-                        print(f"✅ Updated existing user: {existing_customer.customer_id}")  
-                        user_id = existing_customer.customer_id
-                        
-                        # Update their subscription tier
-                        from api_key_manager import SubscriptionTier, api_key_manager
-                        tier = getattr(SubscriptionTier, plan_info['tier'])
-                        api_key_manager.update_customer_subscription(user_id, tier)
+                        print(f"❌ No account found for {customer_email} - user must register first!")
+                        return {
+                            "status": "error", 
+                            "error": f"User {customer_email} must create account before payment"
+                        }
+                    
+                    print(f"✅ Upgrading existing user: {existing_customer.customer_id}")  
+                    user_id = existing_customer.customer_id
+                    
+                    # Update their subscription tier
+                    from api_key_manager import SubscriptionTier, api_key_manager
+                    tier = getattr(SubscriptionTier, plan_info['tier'])
+                    api_key_manager.update_customer_subscription(user_id, tier)
                     
                     # Set up usage tracking
                     if usage_tracker:
