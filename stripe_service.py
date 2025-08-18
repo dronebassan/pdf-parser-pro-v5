@@ -18,14 +18,33 @@ try:
     stripe = stripe_module
     print("✅ Stripe module imported successfully")
     
-    stripe_api_key = os.getenv("STRIPE_SECRET_KEY")
-    if not stripe_api_key:
-        print("❌ STRIPE_SECRET_KEY not found in environment variables")
-        print("Available env vars:", [k for k in os.environ.keys() if 'STRIPE' in k])
-        stripe = None  # Disable stripe if no API key
+    # Try multiple possible environment variable names
+    stripe_api_key = (
+        os.getenv("STRIPE_SECRET_KEY") or
+        os.getenv("STRIPE_SECRET") or 
+        os.getenv("STRIPE_API_KEY") or
+        os.getenv("SK_SECRET_KEY")
+    )
+    
+    print(f"🔍 Environment debug:")
+    print(f"   STRIPE_SECRET_KEY: {'SET' if os.getenv('STRIPE_SECRET_KEY') else 'NOT SET'}")
+    print(f"   All STRIPE vars: {[k for k in os.environ.keys() if 'STRIPE' in k.upper()]}")
+    print(f"   Total env vars: {len(os.environ)}")
+    
+    if not stripe_api_key or stripe_api_key.strip() == "":
+        print("❌ No valid STRIPE_SECRET_KEY found in any variation")
+        stripe = None  # This will trigger demo mode
     else:
-        stripe.api_key = stripe_api_key
-        print(f"✅ Stripe API key set: {stripe_api_key[:7]}..." if stripe_api_key else "❌ No Stripe API key")
+        stripe.api_key = stripe_api_key.strip()
+        print(f"✅ Stripe API key set: {stripe_api_key[:12]}...")
+        
+        # Test the API key immediately
+        try:
+            test_result = stripe.Account.retrieve()
+            print(f"✅ Stripe API key WORKS - Account ID: {test_result.id if hasattr(test_result, 'id') else 'unknown'}")
+        except Exception as test_error:
+            print(f"❌ Stripe API key INVALID: {test_error}")
+            stripe = None  # Force demo mode if key doesn't work
         
 except ImportError as e:
     print(f"❌ Failed to import Stripe: {e}")

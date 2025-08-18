@@ -1817,27 +1817,18 @@ async def test_button(request: dict):
     print(f"🔥 Test button clicked: {request}")
     return {"success": True, "message": "Button click received!", "data": request}
 
-@app.get("/stripe-status/")
-async def stripe_status():
-    """Debug endpoint to check Stripe service status"""
-    try:
-        from stripe_service import stripe_service, stripe
-        return {
-            "stripe_service_exists": stripe_service is not None,
-            "stripe_service_available": stripe_service.available if stripe_service else False,
-            "stripe_module_exists": stripe is not None,
-            "stripe_api_key_set": stripe.api_key is not None if stripe else False,
-            "environment_check": {
-                "stripe_secret_key": os.getenv("STRIPE_SECRET_KEY") is not None,
-                "stripe_webhook_secret": os.getenv("STRIPE_WEBHOOK_SECRET") is not None
-            }
-        }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "stripe_service_exists": False,
-            "stripe_service_available": False
-        }
+@app.get("/env-debug/")
+async def env_debug():
+    """Debug Railway environment variables"""
+    return {
+        "all_env_vars": list(os.environ.keys()),
+        "stripe_vars": {k: v[:10] + "..." if v and len(v) > 10 else v for k, v in os.environ.items() if 'STRIPE' in k.upper()},
+        "stripe_secret_key_raw": os.getenv("STRIPE_SECRET_KEY", "NOT_SET"),
+        "stripe_secret_key_exists": "STRIPE_SECRET_KEY" in os.environ,
+        "stripe_secret_key_length": len(os.getenv("STRIPE_SECRET_KEY", "")),
+        "environment": os.getenv("ENVIRONMENT", "unknown"),
+        "railway_env": os.getenv("RAILWAY_ENVIRONMENT", "unknown")
+    }
 
 @app.post("/parse/")
 async def parse_pdf_advanced(
