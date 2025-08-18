@@ -11,7 +11,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: GEMINI_API_KEY
-        value: AIzaSyDVwJ_jRxIgifFso36nGWaEOedJYYAuuU8
+        sync: false
       - key: DEFAULT_LLM_PROVIDER
         value: gemini
       - key: DEFAULT_STRATEGY
