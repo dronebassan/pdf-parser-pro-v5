@@ -831,26 +831,26 @@ def home():
 
         <script>
             // Check if user is logged in on page load
-            window.addEventListener('load', function() {{
+            window.addEventListener('load', function() {
                 const apiKey = localStorage.getItem('pdf_parser_api_key');
                 const userEmail = localStorage.getItem('pdf_parser_email');
                 
-                if (apiKey && userEmail) {{
+                if (apiKey && userEmail) {
                     showLoggedInState();
-                }}
-            }});
+                }
+            });
             
             // File upload handling
-            function handleFileSelect(event) {{
+            function handleFileSelect(event) {
                 const file = event.target.files[0];
-                if (file && file.type === 'application/pdf') {{
+                if (file && file.type === 'application/pdf') {
                     uploadFile(file);
-                }} else {{
+                } else {
                     alert('Please select a valid PDF file.');
-                }}
-            }}
+                }
+            }
             
-            async function uploadFile(file) {{
+            async function uploadFile(file) {
                 const loadingEl = document.querySelector('.loading');
                 const resultsEl = document.querySelector('.results');
                 const resultsContent = document.getElementById('results-content');
@@ -859,60 +859,60 @@ def home():
                 loadingEl.classList.add('active');
                 resultsEl.classList.remove('active');
                 
-                try {{
+                try {
                     const formData = new FormData();
                     formData.append('file', file);
                     
                     // Add API key if user is logged in
                     const apiKey = localStorage.getItem('pdf_parser_api_key');
-                    const headers = {{}};
-                    if (apiKey) {{
-                        headers['Authorization'] = `Bearer ${{apiKey}}`;
-                    }}
+                    const headers = {};
+                    if (apiKey) {
+                        headers['Authorization'] = `Bearer ${apiKey}`;
+                    }
                     
-                    const response = await fetch('/parse/', {{
+                    const response = await fetch('/parse/', {
                         method: 'POST',
                         headers: headers,
                         body: formData
-                    }});
+                    });
                     
                     const result = await response.json();
                     
                     // Hide loading
                     loadingEl.classList.remove('active');
                     
-                    if (result.success) {{
+                    if (result.success) {
                         // Show results with user info
-                        let displayResult = {{
+                        let displayResult = {
                             success: result.success,
                             text: result.text,
                             pages_processed: result.pages_processed,
                             strategy_used: result.strategy_used,
                             user_info: result.user_info
-                        }};
+                        };
                         resultsContent.textContent = JSON.stringify(displayResult, null, 2);
                         resultsEl.classList.add('active');
                         
                         // Show upgrade prompt if free user hit limit
-                        if (!result.user_info.authenticated && result.pages_processed >= 10) {{
+                        if (!result.user_info.authenticated && result.pages_processed >= 10) {
                             showUpgradePrompt();
-                        }}
-                    }} else {{
+                        }
+                    } else {
                         // Handle free tier limit
-                        if (result.detail && typeof result.detail === 'object') {{
+                        if (result.detail && typeof result.detail === 'object') {
                             showUpgradePrompt(result.detail);
-                        }} else {{
+                        } else {
                             alert('Error: ' + (result.detail || result.error || 'Processing failed'));
-                        }}
-                    }}
-                }} catch (error) {{
+                        }
+                    }
+                } catch (error) {
                     loadingEl.classList.remove('active');
                     alert('Upload failed: ' + error.message);
-                }}
-            }}
+                }
+            }
             
             // Enhanced login functionality with error handling
-            async function quickLogin(event) {{
+            async function quickLogin(event) {
                 event.preventDefault(); // Prevent form submission
                 
                 const email = document.getElementById('loginEmail').value;
@@ -925,26 +925,26 @@ def home():
                 hideLoginError();
                 
                 // Basic validation
-                if (!email || !password) {{
+                if (!email || !password) {
                     showLoginError('Please enter both email and password');
                     return;
-                }}
+                }
                 
                 // Show loading state
                 const originalText = submitBtn.innerHTML;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
                 submitBtn.disabled = true;
                 
-                try {{
-                    const response = await fetch('/auth/login', {{
+                try {
+                    const response = await fetch('/auth/login', {
                         method: 'POST',
-                        headers: {{'Content-Type': 'application/json'}},
-                        body: JSON.stringify({{email: email, password: password}})
-                    }});
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({email: email, password: password})
+                    });
                     
                     const result = await response.json();
                     
-                    if (result.success) {{
+                    if (result.success) {
                         // Store user session
                         localStorage.setItem('pdf_parser_email', email);
                         localStorage.setItem('pdf_parser_logged_in', 'true');
@@ -954,27 +954,27 @@ def home():
                         submitBtn.style.background = 'var(--success-color)';
                         
                         // Transition to logged in state
-                        setTimeout(() => {{
+                        setTimeout(() => {
                             showLoggedInState();
-                        }}, 1000);
-                    }} else {{
+                        }, 1000);
+                    } else {
                         showLoginError(result.message || 'Invalid email or password');
-                    }}
-                }} catch (error) {{
+                    }
+                } catch (error) {
                     showLoginError('Connection error. Please try again.');
                     console.error('Login error:', error);
-                }} finally {{
+                } finally {
                     // Reset button after delay
-                    setTimeout(() => {{
+                    setTimeout(() => {
                         submitBtn.innerHTML = originalText;
                         submitBtn.disabled = false;
                         submitBtn.style.background = '';
-                    }}, 2000);
-                }}
-            }}
+                    }, 2000);
+                }
+            }
             
             // Show login error message
-            function showLoginError(message) {{
+            function showLoginError(message) {
                 const errorDiv = document.getElementById('login-error');
                 const errorText = document.getElementById('login-error-text');
                 
@@ -983,107 +983,107 @@ def home():
                 
                 // Auto-hide after 5 seconds
                 setTimeout(hideLoginError, 5000);
-            }}
+            }
             
             // Hide login error message
-            function hideLoginError() {{
+            function hideLoginError() {
                 const errorDiv = document.getElementById('login-error');
                 errorDiv.style.display = 'none';
-            }}
+            }
             
             // Show logged in state
-            function showLoggedInState() {{
+            function showLoggedInState() {
                 document.getElementById('login-section').style.display = 'none';
                 document.getElementById('account-section').style.display = 'block';
-            }}
+            }
             
             // Logout
-            function logout() {{
+            function logout() {
                 localStorage.removeItem('pdf_parser_api_key');
                 localStorage.removeItem('pdf_parser_email');
                 document.getElementById('login-section').style.display = 'block';
                 document.getElementById('account-section').style.display = 'none';
                 alert('Logged out successfully');
-            }}
+            }
             
             // Show usage info
-            async function showUsage() {{
+            async function showUsage() {
                 const apiKey = localStorage.getItem('pdf_parser_api_key');
                 if (!apiKey) return;
                 
-                try {{
-                    const response = await fetch('/auth/me', {{
-                        headers: {{'Authorization': `Bearer ${{apiKey}}`}}
-                    }});
+                try {
+                    const response = await fetch('/auth/me', {
+                        headers: {'Authorization': `Bearer ${apiKey}`}
+                    });
                     const result = await response.json();
                     
-                    if (result.success) {{
+                    if (result.success) {
                         const usage = result.usage_info;
                         alert(`Usage This Month:
-Pages Used: ${{usage.total_pages || 0}}
-Plan: ${{result.subscription_tier}}
-Total Cost: $${{usage.total_cost || 0}}`);
-                    }}
-                }} catch (error) {{
+Pages Used: ${usage.total_pages || 0}
+Plan: ${result.subscription_tier}
+Total Cost: $${usage.total_cost || 0}`);
+                    }
+                } catch (error) {
                     alert('Could not fetch usage info');
-                }}
-            }}
+                }
+            }
             
             // Show upgrade prompt
-            function showUpgradePrompt(details) {{
+            function showUpgradePrompt(details) {
                 const message = details ? details.message : 'Upgrade for unlimited processing!';
                 const upgradeUrl = details ? details.upgrade_url : '/pricing';
                 
-                if (confirm(message + '\\n\\nGo to pricing page?')) {{
+                if (confirm(message + '\\n\\nGo to pricing page?')) {
                     window.location.href = upgradeUrl;
-                }}
-            }}
+                }
+            }
             
             // Drag and drop functionality
             const uploadArea = document.querySelector('.upload-area');
             
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {{
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
                 uploadArea.addEventListener(eventName, preventDefaults, false);
-            }});
+            });
             
-            function preventDefaults(e) {{
+            function preventDefaults(e) {
                 e.preventDefault();
                 e.stopPropagation();
-            }}
+            }
             
-            ['dragenter', 'dragover'].forEach(eventName => {{
+            ['dragenter', 'dragover'].forEach(eventName => {
                 uploadArea.addEventListener(eventName, highlight, false);
-            }});
+            });
             
-            ['dragleave', 'drop'].forEach(eventName => {{
+            ['dragleave', 'drop'].forEach(eventName => {
                 uploadArea.addEventListener(eventName, unhighlight, false);
-            }});
+            });
             
-            function highlight(e) {{
+            function highlight(e) {
                 uploadArea.style.borderColor = 'var(--primary-color)';
                 uploadArea.style.background = 'var(--background-tertiary)';
-            }}
+            }
             
-            function unhighlight(e) {{
+            function unhighlight(e) {
                 uploadArea.style.borderColor = 'var(--border-color)';
                 uploadArea.style.background = 'var(--background-secondary)';
-            }}
+            }
             
             uploadArea.addEventListener('drop', handleDrop, false);
             
-            function handleDrop(e) {{
+            function handleDrop(e) {
                 const dt = e.dataTransfer;
                 const files = dt.files;
                 
-                if (files.length > 0) {{
+                if (files.length > 0) {
                     const file = files[0];
-                    if (file.type === 'application/pdf') {{
+                    if (file.type === 'application/pdf') {
                         uploadFile(file);
-                    }} else {{
+                    } else {
                         alert('Please drop a valid PDF file.');
-                    }}
-                }}
-            }}
+                    }
+                }
+            }
         </script>
     </body>
     </html>"""
@@ -1542,41 +1542,38 @@ def pricing_page():
             console.log('🔥 PRICING: Script loaded successfully!');
             
             // Test function first - simpler implementation
-            function testButton(planType) {{
+            function testButton(planType) {
                 console.log('🔥 TEST: Button clicked for plan:', planType);
                 alert('✅ SUCCESS! Button is working for plan: ' + planType);
                 
                 // Test fetch to ensure network connectivity
-                fetch('/test-button/', {{
+                fetch('/test-button/', {
                     method: 'POST',
-                    headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{plan: planType, test: true, timestamp: new Date().toISOString()}})
-                }})
-                .then(function(response) {{ return response.json(); }})
-                .then(function(result) {{
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({plan: planType, test: true, timestamp: new Date().toISOString()})
+                })
+                .then(function(response) { return response.json(); })
+                .then(function(result) {
                     console.log('🔥 TEST: Server response:', result);
                     alert('✅ Server Response: ' + JSON.stringify(result, null, 2));
-                }})
-                .catch(function(error) {{
+                })
+                .catch(function(error) {
                     console.error('🔥 TEST: Error:', error);
                     alert('❌ Network Error: ' + error.message);
-                }});
-            }}
+                });
+            }
             
             // Stripe Checkout Integration - Fixed version
-            function createCheckout(planType, buttonElement) {{
+            function createCheckout(planType, buttonElement) {
                 console.log('🔥 CHECKOUT: Function called with planType:', planType);
                 
                 // Get button element safely
                 var button = buttonElement;
-                if (!button && window.event && window.event.target) {{
-                    button = window.event.target;
-                }}
-                if (!button) {{
+                if (!button) {
                     console.error('❌ CHECKOUT: No button element found');
                     alert('Error: Could not find button element');
                     return;
-                }}
+                }
                 
                 var originalText = button.textContent;
                 
@@ -1586,79 +1583,79 @@ def pricing_page():
                 
                 console.log('🔥 CHECKOUT: Button loading state set');
                 
-                // Prepare checkout data - FIXED template string issue
-                var checkoutData = {{
+                // Prepare checkout data
+                var checkoutData = {
                     plan_type: planType,
                     customer_email: '',
-                    success_url: window.location.origin + '/success?session_id=' + '{{CHECKOUT_SESSION_ID}}',
+                    success_url: window.location.origin + '/success?session_id={CHECKOUT_SESSION_ID}',
                     cancel_url: window.location.origin + '/pricing'
-                }};
+                };
                 
                 console.log('🔥 CHECKOUT: Request data:', checkoutData);
                 
-                fetch('/create-checkout-session/', {{
+                fetch('/create-checkout-session/', {
                     method: 'POST',
-                    headers: {{
+                    headers: {
                         'Content-Type': 'application/json',
-                    }},
+                    },
                     body: JSON.stringify(checkoutData)
-                }})
-                .then(function(response) {{
+                })
+                .then(function(response) {
                     console.log('🔥 CHECKOUT: Response status:', response.status);
                     return response.json();
-                }})
-                .then(function(data) {{
+                })
+                .then(function(data) {
                     console.log('🔥 CHECKOUT: Response data:', data);
                     
-                    if (data.success && data.checkout_url) {{
+                    if (data.success && data.checkout_url) {
                         console.log('🔥 CHECKOUT: Redirecting to:', data.checkout_url);
                         window.location.href = data.checkout_url;
-                    }} else {{
+                    } else {
                         var errorMsg = data.error || data.detail || 'Unknown error occurred';
                         alert('❌ Checkout Error: ' + errorMsg);
                         console.error('❌ CHECKOUT: Error:', data);
-                    }}
-                }})
-                .catch(function(error) {{
+                    }
+                })
+                .catch(function(error) {
                     console.error('❌ CHECKOUT: Network error:', error);
                     alert('❌ Connection Error: ' + error.message + '\\n\\nPlease check your internet connection and try again.');
-                }})
-                .finally(function() {{
+                })
+                .finally(function() {
                     // Reset button state
                     button.innerHTML = originalText;
                     button.disabled = false;
                     console.log('🔥 CHECKOUT: Button state reset');
-                }});
-            }}
+                });
+            }
             
             // Initialize when DOM is ready
-            document.addEventListener('DOMContentLoaded', function() {{
+            document.addEventListener('DOMContentLoaded', function() {
                 console.log('🔥 PRICING: DOM loaded, page ready');
                 
                 // Test that all functions are available
-                if (typeof testButton === 'function') {{
+                if (typeof testButton === 'function') {
                     console.log('✅ testButton function available');
-                }} else {{
+                } else {
                     console.error('❌ testButton function missing');
-                }}
+                }
                 
-                if (typeof createCheckout === 'function') {{
+                if (typeof createCheckout === 'function') {
                     console.log('✅ createCheckout function available');
-                }} else {{
+                } else {
                     console.error('❌ createCheckout function missing');
-                }}
-            }});
+                }
+            });
             
             // Global error handler for debugging
-            window.addEventListener('error', function(event) {{
+            window.addEventListener('error', function(event) {
                 console.error('🔥 GLOBAL ERROR:', event.error);
-                console.error('🔥 ERROR DETAILS:', {{
+                console.error('🔥 ERROR DETAILS:', {
                     message: event.message,
                     filename: event.filename,
                     lineno: event.lineno,
                     colno: event.colno
-                }});
-            }});
+                });
+            });
         </script>
     </body>
     </html>
