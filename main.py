@@ -930,15 +930,65 @@ def home():
                                 word-wrap: break-word;
                             `;
                             
+                            const textHeaderContainer = document.createElement('div');
+                            textHeaderContainer.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;';
+                            
                             const textHeader = document.createElement('h3');
                             textHeader.textContent = '📄 Extracted Text';
-                            textHeader.style.cssText = 'margin: 0 0 15px 0; color: #333; font-size: 18px;';
+                            textHeader.style.cssText = 'margin: 0; color: #333; font-size: 18px;';
+                            
+                            const copyButton = document.createElement('button');
+                            copyButton.textContent = '📋 Copy Text';
+                            copyButton.style.cssText = `
+                                background: #007bff;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                padding: 8px 16px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: 500;
+                                transition: background-color 0.2s;
+                            `;
+                            
+                            copyButton.onmouseover = () => copyButton.style.background = '#0056b3';
+                            copyButton.onmouseout = () => copyButton.style.background = '#007bff';
+                            
+                            copyButton.onclick = async () => {
+                                try {
+                                    await navigator.clipboard.writeText(result.text.trim());
+                                    copyButton.textContent = '✅ Copied!';
+                                    copyButton.style.background = '#28a745';
+                                    setTimeout(() => {
+                                        copyButton.textContent = '📋 Copy Text';
+                                        copyButton.style.background = '#007bff';
+                                    }, 2000);
+                                } catch (err) {
+                                    // Fallback for older browsers
+                                    const textArea = document.createElement('textarea');
+                                    textArea.value = result.text.trim();
+                                    document.body.appendChild(textArea);
+                                    textArea.select();
+                                    document.execCommand('copy');
+                                    document.body.removeChild(textArea);
+                                    
+                                    copyButton.textContent = '✅ Copied!';
+                                    copyButton.style.background = '#28a745';
+                                    setTimeout(() => {
+                                        copyButton.textContent = '📋 Copy Text';
+                                        copyButton.style.background = '#007bff';
+                                    }, 2000);
+                                }
+                            };
+                            
+                            textHeaderContainer.appendChild(textHeader);
+                            textHeaderContainer.appendChild(copyButton);
                             
                             const textContent = document.createElement('div');
                             textContent.textContent = result.text.trim();
                             textContent.style.cssText = 'color: #444; font-size: 14px;';
                             
-                            textSection.appendChild(textHeader);
+                            textSection.appendChild(textHeaderContainer);
                             textSection.appendChild(textContent);
                             resultsContent.appendChild(textSection);
                         }
