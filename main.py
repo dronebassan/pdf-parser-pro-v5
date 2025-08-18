@@ -2105,25 +2105,70 @@ async def create_checkout_session(request: CheckoutRequest):
     print(f"🔥 Stripe service status: {stripe_service is not None}")
     
     if not stripe_service:
-        print("❌ Stripe service is None - attempting emergency re-initialization")
-        # Try to re-import and re-initialize stripe_service
+        print("❌ Stripe service is None - FORCING direct Stripe integration")
+        # FORCE direct Stripe initialization using environment variables
         try:
-            from stripe_service import StripeService
-            emergency_service = StripeService()
-            if emergency_service.available:
-                result = emergency_service.create_checkout_session(plan_type, customer_email, success_url, cancel_url)
-                return result
+            import stripe
+            from stripe_service import PlanType, Plan
+            
+            # Get your Stripe key from environment (Railway will have it)
+            api_key = (
+                os.getenv("STRIPE_SECRET_KEY") or
+                os.getenv("STRIPE_SECRET") or
+                os.getenv("STRIPE_API_KEY")
+            )
+            
+            if not api_key:
+                print("❌ No Stripe API key found in environment")
+                raise HTTPException(status_code=500, detail="Stripe API key not configured on Railway")
+            
+            stripe.api_key = api_key
+            print("🔥 FORCED: Using Stripe key from Railway environment")
+            
+            # Test connection
+            account = stripe.Account.retrieve()
+            print(f"✅ FORCED: Connected to Stripe account {account.id}")
+            
+            # Map plan types to prices
+            plan_configs = {
+                "student": {"name": "Student Plan", "price": 6.99},
+                "growth": {"name": "Growth Plan", "price": 26.99},
+                "business": {"name": "Business Plan", "price": 109.99}
+            }
+            
+            plan_config = plan_configs[request.plan_type.lower()]
+            
+            # Create dynamic price for your account
+            dynamic_price = stripe.Price.create(
+                unit_amount=int(plan_config["price"] * 100),
+                currency='cad',
+                recurring={'interval': 'month'},
+                product_data={'name': plan_config["name"]}
+            )
+            print(f"✅ FORCED: Created price {dynamic_price.id} for {plan_config['name']}")
+            
+            # Create checkout session with YOUR account
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                customer_email=request.customer_email,
+                line_items=[{'price': dynamic_price.id, 'quantity': 1}],
+                mode='subscription',
+                success_url=request.success_url + '?session_id={CHECKOUT_SESSION_ID}',
+                cancel_url=request.cancel_url,
+                metadata={'plan_type': request.plan_type, 'plan_name': plan_config["name"]}
+            )
+            
+            print(f"✅ FORCED: Created YOUR checkout session {checkout_session.id}")
+            return {
+                "success": True,
+                "checkout_url": checkout_session.url,
+                "session_id": checkout_session.id,
+                "forced_mode": True
+            }
+            
         except Exception as e:
-            print(f"❌ Emergency re-initialization failed: {e}")
-        
-        # Last resort: return demo checkout
-        return {
-            "success": True,
-            "checkout_url": "https://buy.stripe.com/test_28o03a9II9qH0M0000",
-            "session_id": f"emergency_{plan_type.value}_{int(time.time())}",
-            "emergency_mode": True,
-            "message": "Emergency checkout mode - contact support if issues persist"
-        }
+            print(f"❌ FORCED initialization failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Stripe setup failed: {str(e)}")
     
     try:
         # Validate plan type
