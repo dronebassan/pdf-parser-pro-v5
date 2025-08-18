@@ -42,6 +42,22 @@ try:
         try:
             test_result = stripe.Account.retrieve()
             print(f"✅ Stripe API key WORKS - Account ID: {test_result.id if hasattr(test_result, 'id') else 'unknown'}")
+            
+            # List available products and prices for debugging
+            try:
+                products = stripe.Product.list(limit=5)
+                print(f"🔍 Available Stripe products: {len(products.data)}")
+                for product in products.data:
+                    print(f"   Product: {product.name} ({product.id})")
+                    
+                prices = stripe.Price.list(limit=10)
+                print(f"🔍 Available Stripe prices: {len(prices.data)}")
+                for price in prices.data:
+                    print(f"   Price: {price.id} - ${(price.unit_amount or 0)/100} {price.currency}")
+                    
+            except Exception as list_error:
+                print(f"⚠️  Could not list products/prices: {list_error}")
+                
         except Exception as test_error:
             print(f"❌ Stripe API key INVALID: {test_error}")
             stripe = None  # Force demo mode if key doesn't work
@@ -102,7 +118,7 @@ class StripeService:
                     "All advanced features",
                     "Email support"
                 ],
-                stripe_price_id=os.getenv("STRIPE_STUDENT_PRICE_ID", "price_1RxLhYCVZzvkFjSrXR0pCSoO"),
+                stripe_price_id=os.getenv("STRIPE_STUDENT_PRICE_ID", "price_1QZFn6CVZzvkFjSrF8nB8k4k"),
                 stripe_usage_price_id=os.getenv("STRIPE_STUDENT_USAGE_PRICE_ID", "")
             ),
             PlanType.GROWTH: Plan(
@@ -117,7 +133,7 @@ class StripeService:
                     "Chat support",
                     "API access"
                 ],
-                stripe_price_id=os.getenv("STRIPE_GROWTH_PRICE_ID", "price_1RxLjPCVZzvkFjSr8Fm6xVAj"),
+                stripe_price_id=os.getenv("STRIPE_GROWTH_PRICE_ID", "price_1QZFnoGVZzvkFjSrNm7K9Wjl"),
                 stripe_usage_price_id=os.getenv("STRIPE_GROWTH_USAGE_PRICE_ID", "")
             ),
             PlanType.BUSINESS: Plan(
@@ -133,7 +149,7 @@ class StripeService:
                     "Full API access",
                     "Custom integrations"
                 ],
-                stripe_price_id=os.getenv("STRIPE_BUSINESS_PRICE_ID", "price_1RxLk5CVZzvkFjSrSfrJfv0S"),
+                stripe_price_id=os.getenv("STRIPE_BUSINESS_PRICE_ID", "price_1QZFoGCVZzvkFjSrYc8tH2mp"),
                 stripe_usage_price_id=os.getenv("STRIPE_BUSINESS_USAGE_PRICE_ID", "")
             )
         }
@@ -158,11 +174,29 @@ class StripeService:
         # Try real Stripe checkout
         try:
             print(f"💳 Creating real Stripe session for {plan.name}")
+            
+            # First verify the price exists, create if needed
+            price_id = plan.stripe_price_id
+            try:
+                price_check = stripe.Price.retrieve(price_id)
+                print(f"✅ Price {price_id} exists")
+            except:
+                print(f"⚠️  Price {price_id} not found, creating dynamic price")
+                # Create price on-the-fly
+                dynamic_price = stripe.Price.create(
+                    unit_amount=int(plan.price_monthly * 100),  # Convert to cents
+                    currency='cad',
+                    recurring={'interval': 'month'},
+                    product_data={'name': plan.name}
+                )
+                price_id = dynamic_price.id
+                print(f"✅ Created dynamic price: {price_id}")
+            
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
                 customer_email=customer_email,
                 line_items=[{
-                    'price': plan.stripe_price_id,
+                    'price': price_id,
                     'quantity': 1,
                 }],
                 mode='subscription',
