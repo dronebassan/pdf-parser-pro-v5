@@ -38,11 +38,16 @@ ocr_service = None
 llm_service = None
 
 try:
+    print("🔍 Attempting to import SmartParser...")
     from smart_parser import SmartParser
     smart_parser = SmartParser()
     print("✅ Smart Parser initialized with revolutionary 3-step fallback system")
+except ImportError as ie:
+    print(f"⚠️  SmartParser import failed: {ie}")
+    smart_parser = None
 except Exception as e:
     print(f"❌ Smart parser failed: {e}")
+    smart_parser = None
 
 try:
     from performance_tracker import PerformanceTracker
@@ -91,15 +96,31 @@ elif smart_parser:
 else:
     print("\n⚠️  Basic mode - Some advanced features unavailable")
 
-# Initialize Stripe and Usage Tracking
+# Initialize Stripe and Usage Tracking - SAFE IMPORT
+stripe_service = None
+usage_tracker = None
+PlanType = None
+
 try:
+    print("🔍 Attempting to import stripe_service...")
     from stripe_service import stripe_service, PlanType
-    from usage_tracker import usage_tracker
-    print("✅ Stripe billing service initialized")
-    print("✅ Usage tracking system initialized")
-except Exception as e:
-    print(f"❌ Billing services failed: {e}")
+    print("✅ Stripe service imported successfully")
+except ImportError as ie:
+    print(f"⚠️  Stripe service import failed: {ie}")
     stripe_service = None
+except Exception as e:
+    print(f"❌ Stripe service initialization failed: {e}")
+    stripe_service = None
+
+try:
+    print("🔍 Attempting to import usage_tracker...")
+    from usage_tracker import usage_tracker
+    print("✅ Usage tracker imported successfully")
+except ImportError as ie:
+    print(f"⚠️  Usage tracker import failed: {ie}")
+    usage_tracker = None
+except Exception as e:
+    print(f"❌ Usage tracker initialization failed: {e}")
     usage_tracker = None
 
 # Initialize Authentication System
