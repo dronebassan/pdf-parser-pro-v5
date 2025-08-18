@@ -1468,7 +1468,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> All advanced features</li>
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
-                    <button onclick="createCheckout('student')" class="plan-button secondary">Get Started</button>
+                    <button onclick="createCheckout('student', this)" class="plan-button secondary">Get Started</button>
                 </div>
 
                 <div class="pricing-card popular">
@@ -1486,7 +1486,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Chat support</li>
                         <li><i class="fas fa-check"></i> API access</li>
                     </ul>
-                    <button onclick="createCheckout('growth')" class="plan-button">Get Started</button>
+                    <button onclick="createCheckout('growth', this)" class="plan-button">Get Started</button>
                 </div>
 
                 <div class="pricing-card">
@@ -1505,7 +1505,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Full API access</li>
                         <li><i class="fas fa-check"></i> Custom integrations</li>
                     </ul>
-                    <button onclick="createCheckout('business')" class="plan-button">Get Started</button>
+                    <button onclick="createCheckout('business', this)" class="plan-button">Get Started</button>
                 </div>
             </section>
 
@@ -1537,15 +1537,21 @@ def pricing_page():
         
         <script>
             // Stripe Checkout Integration
-            async function createCheckout(planType) {{
-                const button = event.target;
+            async function createCheckout(planType, buttonElement) {{
+                console.log('createCheckout called with:', planType);
+                
+                const button = buttonElement || event.target;
                 const originalText = button.textContent;
                 
                 // Show loading state
                 button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
                 button.disabled = true;
                 
+                console.log('Button loading state set');
+                
                 try {{
+                    console.log('Making fetch request to /create-checkout-session/');
+                    
                     const response = await fetch('/create-checkout-session/', {{
                         method: 'POST',
                         headers: {{
@@ -1559,9 +1565,13 @@ def pricing_page():
                         }})
                     }});
                     
+                    console.log('Response status:', response.status);
+                    
                     const data = await response.json();
+                    console.log('Response data:', data);
                     
                     if (data.success) {{
+                        console.log('Redirecting to:', data.checkout_url);
                         // Redirect to Stripe checkout
                         window.location.href = data.checkout_url;
                     }} else {{
@@ -1569,7 +1579,7 @@ def pricing_page():
                         console.error('Checkout error:', data);
                     }}
                 }} catch (error) {{
-                    alert('Connection error. Please try again.');
+                    alert('Connection error. Please try again. Check console for details.');
                     console.error('Network error:', error);
                 }} finally {{
                     // Reset button
