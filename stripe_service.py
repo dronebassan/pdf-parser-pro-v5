@@ -109,7 +109,7 @@ class StripeService:
         self.plans = {
             PlanType.STUDENT: Plan(
                 name="Student Plan",
-                price_monthly=6.99,
+                price_monthly=4.99,
                 pages_included=500,
                 overage_rate=0.01,
                 features=[
@@ -123,7 +123,7 @@ class StripeService:
             ),
             PlanType.GROWTH: Plan(
                 name="Growth Plan",
-                price_monthly=26.99,
+                price_monthly=19.99,
                 pages_included=2500,
                 overage_rate=0.008,
                 features=[
@@ -138,7 +138,7 @@ class StripeService:
             ),
             PlanType.BUSINESS: Plan(
                 name="Business Plan",
-                price_monthly=109.99,
+                price_monthly=49.99,
                 pages_included=10000,
                 overage_rate=0.008,
                 features=[

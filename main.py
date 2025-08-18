@@ -811,7 +811,7 @@ def home():
                             <p>Don't have an account?</p>
                             <a href="/pricing" class="signup-link">
                                 <i class="fas fa-rocket"></i>
-                                Get started for $6.99 CAD/month
+                                Get started for $4.99 CAD/month
                             </a>
                         </div>
                     </div>
@@ -1468,7 +1468,7 @@ def pricing_page():
                 <div class="pricing-card">
                     <div class="plan-name">Student</div>
                     <div class="plan-price">
-                        <span class="currency">$</span>6.99
+                        <span class="currency">$</span>4.99
                         <span class="period">/month CAD</span>
                     </div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">Plus applicable taxes</div>
@@ -1485,7 +1485,7 @@ def pricing_page():
                 <div class="pricing-card popular">
                     <div class="plan-name">Growth</div>
                     <div class="plan-price">
-                        <span class="currency">$</span>26.99
+                        <span class="currency">$</span>19.99
                         <span class="period">/month CAD</span>
                     </div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">Plus applicable taxes</div>
@@ -1503,7 +1503,7 @@ def pricing_page():
                 <div class="pricing-card">
                     <div class="plan-name">Business</div>
                     <div class="plan-price">
-                        <span class="currency">$</span>109.99
+                        <span class="currency">$</span>49.99
                         <span class="period">/month CAD</span>
                     </div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">Plus applicable taxes</div>
@@ -2162,9 +2162,9 @@ async def create_checkout_session(request: CheckoutRequest):
             
             # Map plan types to prices
             plan_configs = {
-                "student": {"name": "Student Plan", "price": 6.99},
-                "growth": {"name": "Growth Plan", "price": 26.99},
-                "business": {"name": "Business Plan", "price": 109.99}
+                "student": {"name": "Student Plan", "price": 4.99},
+                "growth": {"name": "Growth Plan", "price": 19.99},
+                "business": {"name": "Business Plan", "price": 49.99}
             }
             
             plan_config = plan_configs[request.plan_type.lower()]
