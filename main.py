@@ -1747,83 +1747,20 @@ def pricing_page():
             function createCheckout(planType, buttonElement) {
                 console.log('🔥 CHECKOUT: Function called with planType:', planType);
                 
-                // Check if user is logged in first
-                var token = localStorage.getItem('token');
-                if (!token) {
-                    // User not logged in - redirect to register
-                    alert('Please create an account first to subscribe to a plan!');
-                    window.location.href = '/auth/register?plan=' + planType;
-                    return;
-                }
-                
-                // Get button element safely
+                // Show loading state on button
                 var button = buttonElement;
-                if (!button) {
-                    console.error('❌ CHECKOUT: No button element found');
-                    alert('Error: Could not find button element');
-                    return;
+                if (button) {
+                    var originalText = button.textContent;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+                    button.disabled = true;
                 }
                 
-                var originalText = button.textContent;
+                console.log('🔥 CHECKOUT: Redirecting to protected subscription route');
                 
-                // Show loading state
-                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-                button.disabled = true;
-                
-                console.log('🔥 CHECKOUT: Button loading state set, user is logged in');
-                
-                // Prepare checkout data
-                var checkoutData = {
-                    plan_type: planType,
-                    customer_email: '',  // Will be filled from JWT token
-                    success_url: window.location.origin + '/success?session_id={CHECKOUT_SESSION_ID}',
-                    cancel_url: window.location.origin + '/pricing'
-                };
-                
-                console.log('🔥 CHECKOUT: Request data:', checkoutData);
-                
-                fetch('/create-checkout-session/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + token
-                    },
-                    body: JSON.stringify(checkoutData)
-                })
-                .then(function(response) {
-                    console.log('🔥 CHECKOUT: Response status:', response.status);
-                    return response.json();
-                })
-                .then(function(data) {
-                    console.log('🔥 CHECKOUT: Response data:', data);
-                    
-                    if (data.success && data.checkout_url) {
-                        console.log('🔥 CHECKOUT: Redirecting to:', data.checkout_url);
-                        window.location.href = data.checkout_url;
-                    } else {
-                        // Handle authentication errors
-                        if (data.detail && data.detail.error === 'Must create account first') {
-                            alert('Please create an account first to subscribe!');
-                            window.location.href = '/auth/register?plan=' + planType;
-                            return;
-                        }
-                        
-                        // Show other errors
-                        var errorMsg = data.error || data.detail || 'Unknown error occurred';
-                        alert('❌ Error: ' + errorMsg);
-                        console.error('❌ CHECKOUT: Error details:', data);
-                    }
-                })
-                .catch(function(error) {
-                    console.error('❌ CHECKOUT: Network error:', error);
-                    alert('❌ Connection Error: ' + error.message + '\\n\\nPlease check your internet connection and try again.');
-                })
-                .finally(function() {
-                    // Reset button state
-                    button.innerHTML = originalText;
-                    button.disabled = false;
-                    console.log('🔥 CHECKOUT: Button state reset');
-                });
+                // Redirect to protected route - it will handle authentication check
+                // If user is not logged in, they'll be redirected to register with plan pre-selected
+                // If user is logged in, they'll be redirected to Stripe Payment Link
+                window.location.href = '/subscribe/' + planType;
             }
             
             // Initialize when DOM is ready
@@ -2286,11 +2223,44 @@ def get_pricing():
         "currency": "USD"
     }
 
+@app.get("/subscribe/{plan_type}")
+async def subscribe_redirect(plan_type: str, current_user = Depends(get_current_user_optional)):
+    """Protected route that redirects to payment - REQUIRES LOGIN"""
+    
+    # User must be logged in to access payment
+    if not current_user:
+        # Redirect to registration with plan selection
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=f"/pricing?register=true&plan={plan_type}", status_code=302)
+    
+    print(f"🔥 Authenticated user {current_user.email} accessing {plan_type} plan")
+    
+    # Your actual Payment Links from Stripe Dashboard  
+    payment_links = {
+        "student": "https://buy.stripe.com/4gM14m11zaRk2ELcT6e3e04",    # Student Plan: $4.99 CAD/month
+        "growth": "https://buy.stripe.com/4gMeVcfWt4sW7Z5cT6e3e05",     # Growth Plan: $19.99 CAD/month
+        "business": "https://buy.stripe.com/eVq9AS25D3oS5QX2ese3e06"    # Business Plan: $49.99 CAD/month
+    }
+    
+    checkout_url = payment_links.get(plan_type.lower(), payment_links["student"])
+    
+    # Add user email as URL parameter so Stripe can pre-fill it
+    if "?" in checkout_url:
+        checkout_url += f"&prefilled_email={current_user.email}"
+    else:
+        checkout_url += f"?prefilled_email={current_user.email}"
+    
+    print(f"✅ Redirecting logged-in user {current_user.email} to: {checkout_url}")
+    
+    # Direct redirect to Stripe Payment Link
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=checkout_url, status_code=302)
+
 @app.post("/create-checkout-session/")
 async def create_checkout_session(request: CheckoutRequest, current_user = Depends(get_current_user)):
-    """Create Stripe checkout session - REQUIRES USER TO BE LOGGED IN FIRST"""
+    """Legacy endpoint - redirects to new protected route"""
     
-    print(f"🔥 Checkout request from user: {current_user.email}")
+    print(f"🔥 Legacy checkout request from user: {current_user.email}")
     
     # User must be logged in to pay
     if not current_user:
@@ -2384,9 +2354,9 @@ async def stripe_webhook(request: Request):
             # Determine plan type from price ID
             price_id = subscription['items']['data'][0]['price']['id']
             plan_map = {
-                "price_1RxLhYCVZzvkFjSrXR0pCSoO": {"plan": "student", "pages": 500, "tier": "STUDENT"},
-                "price_1RxLjPCVZzvkFjSr8Fm6xVAj": {"plan": "growth", "pages": 2500, "tier": "GROWTH"}, 
-                "price_1RxLk5CVZzvkFjSrSfrJfv0S": {"plan": "business", "pages": 10000, "tier": "BUSINESS"}
+                "price_1QZFn6CVZzvkFjSrF8nB8k4k": {"plan": "student", "pages": 500, "tier": "STUDENT"},
+                "price_1QZFnoGVZzvkFjSrNm7K9Wjl": {"plan": "growth", "pages": 2500, "tier": "GROWTH"}, 
+                "price_1QZFoGCVZzvkFjSrYc8tH2mp": {"plan": "business", "pages": 10000, "tier": "BUSINESS"}
             }
             
             plan_info = plan_map.get(price_id, {"plan": "student", "pages": 500, "tier": "STUDENT"})
