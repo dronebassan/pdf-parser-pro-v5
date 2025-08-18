@@ -2306,29 +2306,22 @@ async def create_checkout_session(request: CheckoutRequest):
                 stripe.api_key = api_key
                 print(f"✅ Using YOUR Stripe key: {api_key[:15]}...")
                 
-                # Your pricing
-                prices = {
-                    "student": {"amount": 499, "name": "Student Plan"},    # $4.99 CAD
-                    "growth": {"amount": 1999, "name": "Growth Plan"},     # $19.99 CAD
-                    "business": {"amount": 4999, "name": "Business Plan"}  # $49.99 CAD
+                # Pre-configured Price IDs (create these in your Stripe Dashboard first)
+                price_ids = {
+                    "student": "price_1QZFn6CVZzvkFjSrF8nB8k4k",   # Replace with your actual price ID
+                    "growth": "price_1QZFnoGVZzvkFjSrNm7K9Wjl",    # Replace with your actual price ID  
+                    "business": "price_1QZFoGCVZzvkFjSrYc8tH2mp"   # Replace with your actual price ID
                 }
                 
-                plan = prices[request.plan_type.lower()]
+                price_id = price_ids[request.plan_type.lower()]
                 
-                # Create checkout session for YOUR account
+                # Create checkout session using existing price (like Stripe sample)
                 session = stripe.checkout.Session.create(
-                    payment_method_types=['card'],
                     line_items=[{
-                        'price_data': {
-                            'currency': 'cad',
-                            'product_data': {'name': plan["name"]},
-                            'unit_amount': plan["amount"],
-                            'recurring': {'interval': 'month'}
-                        },
+                        'price': price_id,
                         'quantity': 1,
                     }],
                     mode='subscription',
-                    customer_email=request.customer_email,
                     success_url=request.success_url + '?session_id={CHECKOUT_SESSION_ID}',
                     cancel_url=request.cancel_url,
                 )
