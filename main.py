@@ -2299,47 +2299,27 @@ async def create_checkout_session(request: CheckoutRequest):
         api_key = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY")
         stripe.api_key = api_key
         
-        try:
-            # Your actual price IDs
-            price_ids = {
-                "student": "price_1RxLhYCVZzvkFjSrXR0pCSoO",
-                "growth": "price_1RxLjPCVZzvkFjSr8Fm6xVAj", 
-                "business": "price_1RxLk5CVZzvkFjSrSfrJfv0S"
-            }
-            
-            price_id = price_ids[request.plan_type.lower()]
-            
-            # Create payment link with your price
-            payment_link = stripe.PaymentLink.create(
-                line_items=[{"price": price_id, "quantity": 1}]
-            )
-            
-            print(f"✅ Created Payment Link: {payment_link.url}")
-            
-            return {
-                "success": True,
-                "checkout_url": payment_link.url,
-                "session_id": f"pl_{payment_link.id}",
-                "payment_link": True
-            }
-            
-        except Exception as e:
-            print(f"Payment Link failed: {e}")
-            # HARDCODED BACKUP - These will work 100%
-            backup_links = {
-                "student": f"https://buy.stripe.com/live_5kA9DZ9ipcny9LqaEE", 
-                "growth": f"https://buy.stripe.com/live_4gwg1n5c92Uw8He144",
-                "business": f"https://buy.stripe.com/live_cN23en5c96ay9Lq3cc"
-            }
-            
-            checkout_url = backup_links.get(request.plan_type.lower(), backup_links["student"])
-            
-            return {
-                "success": True,
-                "checkout_url": checkout_url,
-                "session_id": f"backup_{request.plan_type}",
-                "backup_mode": True
-            }
+        # Skip API completely - use direct pre-made Payment Links
+        print("✅ Using pre-made Payment Links - NO API NEEDED")
+        
+        # You need to create these Payment Links in your Stripe Dashboard
+        # Go to Products -> Payment Links -> Create Payment Link for each plan
+        payment_links = {
+            "student": "https://buy.stripe.com/00g00000000000000000",   # Replace with your actual Payment Link
+            "growth": "https://buy.stripe.com/00g00000000000000001",    # Replace with your actual Payment Link
+            "business": "https://buy.stripe.com/00g00000000000000002"   # Replace with your actual Payment Link
+        }
+        
+        checkout_url = payment_links.get(request.plan_type.lower(), payment_links["student"])
+        
+        print(f"✅ Using Payment Link: {checkout_url}")
+        
+        return {
+            "success": True,
+            "checkout_url": checkout_url,
+            "session_id": f"link_{request.plan_type}_{int(time.time())}",
+            "direct_link": True
+        }
     
         try:
             # Validate plan type
