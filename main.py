@@ -1480,7 +1480,6 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
                     <button onclick="createCheckout('student', this)" class="plan-button secondary">Get Started</button>
-                    <button onclick="debugStripeStatus()" style="width: 100%; margin-top: 0.5rem; padding: 0.5rem; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">🔍 Debug Stripe Status</button>
                 </div>
 
                 <div class="pricing-card popular">
