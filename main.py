@@ -745,7 +745,18 @@ def home():
                     <li><a href="/pricing">Pricing</a></li>
                     <li><a href="/docs">API Docs</a></li>
                 </ul>
-                <a href="/pricing" class="cta-button">Get Started</a>
+                
+                <!-- Usage Tracker - Only shown when logged in -->
+                <div id="usage-tracker" style="display: none; background: #667eea; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.875rem; font-weight: 500; margin-right: 1rem;">
+                    <i class="fas fa-chart-line"></i>
+                    <span id="usage-text">Loading...</span>
+                </div>
+                
+                <!-- Auth buttons -->
+                <div class="auth-section">
+                    <a href="/pricing" class="cta-button" id="get-started-btn">Get Started</a>
+                    <button onclick="logout()" class="btn-secondary" id="logout-btn" style="display: none; background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; margin-left: 0.5rem;">Logout</button>
+                </div>
             </div>
         </nav>
 
@@ -909,6 +920,8 @@ def home():
                     loadingEl.classList.remove('active');
                     
                     if (result.success) {
+                        // Update usage tracker after successful processing
+                        updateUsageTracker();
                         // Show success message first
                         if (result.success_message) {
                             const successDiv = document.createElement('div');
@@ -1192,6 +1205,14 @@ def home():
             function showLoggedInState() {
                 document.getElementById('login-section').style.display = 'none';
                 document.getElementById('account-section').style.display = 'block';
+                
+                // Show usage tracker in navbar
+                document.getElementById('usage-tracker').style.display = 'block';
+                document.getElementById('get-started-btn').style.display = 'none';
+                document.getElementById('logout-btn').style.display = 'inline-block';
+                
+                // Load and display usage information
+                updateUsageTracker();
             }
             
             // Logout
@@ -1200,6 +1221,12 @@ def home():
                 localStorage.removeItem('pdf_parser_email');
                 document.getElementById('login-section').style.display = 'block';
                 document.getElementById('account-section').style.display = 'none';
+                
+                // Hide usage tracker and show get started button
+                document.getElementById('usage-tracker').style.display = 'none';
+                document.getElementById('get-started-btn').style.display = 'inline-block';
+                document.getElementById('logout-btn').style.display = 'none';
+                
                 alert('Logged out successfully');
             }
             
@@ -1223,6 +1250,54 @@ Total Cost: $${usage.total_cost || 0}`);
                     }
                 } catch (error) {
                     alert('Could not fetch usage info');
+                }
+            }
+            
+            // Update usage tracker in navbar
+            async function updateUsageTracker() {
+                const apiKey = localStorage.getItem('pdf_parser_api_key');
+                if (!apiKey) return;
+                
+                try {
+                    const response = await fetch('/auth/me', {
+                        headers: {'Authorization': `Bearer ${apiKey}`}
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        const usage = result.usage_info;
+                        const tier = result.subscription_tier.toLowerCase();
+                        
+                        // Calculate remaining pages based on subscription tier
+                        const planLimits = {
+                            'student': 500,
+                            'growth': 2500,
+                            'business': 10000,
+                            'free': 10
+                        };
+                        
+                        const maxPages = planLimits[tier] || 10;
+                        const usedPages = usage.total_pages || 0;
+                        const remainingPages = Math.max(0, maxPages - usedPages);
+                        
+                        // Update the usage tracker display
+                        const usageText = document.getElementById('usage-text');
+                        const tracker = document.getElementById('usage-tracker');
+                        
+                        if (remainingPages <= 0) {
+                            usageText.textContent = `${tier.toUpperCase()}: 0 pages left`;
+                            tracker.style.background = '#dc2626'; // Red for no pages left
+                        } else if (remainingPages < maxPages * 0.2) {
+                            usageText.textContent = `${tier.toUpperCase()}: ${remainingPages} pages left`;
+                            tracker.style.background = '#f59e0b'; // Orange for low pages
+                        } else {
+                            usageText.textContent = `${tier.toUpperCase()}: ${remainingPages} pages left`;
+                            tracker.style.background = '#667eea'; // Blue for good
+                        }
+                    }
+                } catch (error) {
+                    console.error('Could not fetch usage info:', error);
+                    document.getElementById('usage-text').textContent = 'Usage unavailable';
                 }
             }
             
@@ -1836,6 +1911,245 @@ def pricing_page():
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
+@app.get("/auth/register")
+async def register_page(plan: str = "student"):
+    """Registration page with password collection"""
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Create Account - PDF Parser</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            
+            body {{
+                font-family: 'Inter', sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+            }}
+            
+            .auth-container {{
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                padding: 3rem;
+                width: 100%;
+                max-width: 400px;
+            }}
+            
+            .logo {{
+                text-align: center;
+                margin-bottom: 2rem;
+                font-size: 2rem;
+                font-weight: 700;
+                color: #667eea;
+            }}
+            
+            .plan-badge {{
+                background: #667eea;
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                font-size: 0.875rem;
+                text-align: center;
+                margin-bottom: 2rem;
+                font-weight: 500;
+            }}
+            
+            .form-group {{
+                margin-bottom: 1.5rem;
+            }}
+            
+            label {{
+                display: block;
+                margin-bottom: 0.5rem;
+                font-weight: 500;
+                color: #374151;
+            }}
+            
+            input {{
+                width: 100%;
+                padding: 0.75rem 1rem;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 1rem;
+                transition: border-color 0.2s;
+            }}
+            
+            input:focus {{
+                outline: none;
+                border-color: #667eea;
+            }}
+            
+            .btn-primary {{
+                width: 100%;
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 0.875rem 1rem;
+                border-radius: 8px;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background-color 0.2s;
+                margin-bottom: 1rem;
+            }}
+            
+            .btn-primary:hover {{
+                background: #5a67d8;
+            }}
+            
+            .btn-primary:disabled {{
+                background: #9ca3af;
+                cursor: not-allowed;
+            }}
+            
+            .login-link {{
+                text-align: center;
+                color: #6b7280;
+                font-size: 0.875rem;
+            }}
+            
+            .login-link a {{
+                color: #667eea;
+                text-decoration: none;
+                font-weight: 500;
+            }}
+            
+            .error {{
+                background: #fee2e2;
+                color: #dc2626;
+                padding: 0.75rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+                font-size: 0.875rem;
+            }}
+            
+            .success {{
+                background: #dcfce7;
+                color: #16a34a;
+                padding: 0.75rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+                font-size: 0.875rem;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="auth-container">
+            <div class="logo">
+                <i class="fas fa-file-pdf"></i> PDF Parser
+            </div>
+            
+            <div class="plan-badge">
+                Creating account for {plan.title()} Plan
+            </div>
+            
+            <div id="message"></div>
+            
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required minlength="6">
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" required minlength="6">
+                </div>
+                
+                <button type="submit" class="btn-primary" id="submitBtn">
+                    Create Account & Continue to Payment
+                </button>
+            </form>
+            
+            <div class="login-link">
+                Already have an account? <a href="/auth/login?plan={plan}">Sign in</a>
+            </div>
+        </div>
+        
+        <script>
+            document.getElementById('registerForm').addEventListener('submit', async function(e) {{
+                e.preventDefault();
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                const messageDiv = document.getElementById('message');
+                const submitBtn = document.getElementById('submitBtn');
+                
+                // Clear previous messages
+                messageDiv.innerHTML = '';
+                
+                // Validate passwords match
+                if (password !== confirmPassword) {{
+                    messageDiv.innerHTML = '<div class="error">Passwords do not match</div>';
+                    return;
+                }}
+                
+                // Validate password length
+                if (password.length < 6) {{
+                    messageDiv.innerHTML = '<div class="error">Password must be at least 6 characters</div>';
+                    return;
+                }}
+                
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Account...';
+                
+                try {{
+                    const response = await fetch('/auth/register', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json'
+                        }},
+                        body: JSON.stringify({{
+                            email: email,
+                            password: password,
+                            plan_type: '{plan}'
+                        }})
+                    }});
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {{
+                        messageDiv.innerHTML = '<div class="success">Account created successfully! Redirecting to payment...</div>';
+                        
+                        // Store login info and redirect to Stripe
+                        setTimeout(() => {{
+                            window.location.href = '/subscribe/{plan}';
+                        }}, 1500);
+                    }} else {{
+                        throw new Error(data.error || 'Registration failed');
+                    }}
+                }} catch (error) {{
+                    messageDiv.innerHTML = `<div class="error">${{error.message}}</div>`;
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Create Account & Continue to Payment';
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
 @app.post("/auth/register")
 async def register_user(registration: UserRegistration):
     """Register a new user"""
@@ -1905,6 +2219,230 @@ async def register_user(registration: UserRegistration):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+@app.get("/auth/login")
+async def login_page(plan: str = "student"):
+    """Login page for existing users"""
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sign In - PDF Parser</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            
+            body {{
+                font-family: 'Inter', sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+            }}
+            
+            .auth-container {{
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                padding: 3rem;
+                width: 100%;
+                max-width: 400px;
+            }}
+            
+            .logo {{
+                text-align: center;
+                margin-bottom: 2rem;
+                font-size: 2rem;
+                font-weight: 700;
+                color: #667eea;
+            }}
+            
+            .plan-badge {{
+                background: #667eea;
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                font-size: 0.875rem;
+                text-align: center;
+                margin-bottom: 2rem;
+                font-weight: 500;
+            }}
+            
+            .form-group {{
+                margin-bottom: 1.5rem;
+            }}
+            
+            label {{
+                display: block;
+                margin-bottom: 0.5rem;
+                font-weight: 500;
+                color: #374151;
+            }}
+            
+            input {{
+                width: 100%;
+                padding: 0.75rem 1rem;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 1rem;
+                transition: border-color 0.2s;
+            }}
+            
+            input:focus {{
+                outline: none;
+                border-color: #667eea;
+            }}
+            
+            .btn-primary {{
+                width: 100%;
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 0.875rem 1rem;
+                border-radius: 8px;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: background-color 0.2s;
+                margin-bottom: 1rem;
+            }}
+            
+            .btn-primary:hover {{
+                background: #5a67d8;
+            }}
+            
+            .btn-primary:disabled {{
+                background: #9ca3af;
+                cursor: not-allowed;
+            }}
+            
+            .register-link {{
+                text-align: center;
+                color: #6b7280;
+                font-size: 0.875rem;
+            }}
+            
+            .register-link a {{
+                color: #667eea;
+                text-decoration: none;
+                font-weight: 500;
+            }}
+            
+            .error {{
+                background: #fee2e2;
+                color: #dc2626;
+                padding: 0.75rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+                font-size: 0.875rem;
+            }}
+            
+            .success {{
+                background: #dcfce7;
+                color: #16a34a;
+                padding: 0.75rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+                font-size: 0.875rem;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="auth-container">
+            <div class="logo">
+                <i class="fas fa-file-pdf"></i> PDF Parser
+            </div>
+            
+            <div class="plan-badge">
+                Sign in to subscribe to {plan.title()} Plan
+            </div>
+            
+            <div id="message"></div>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="btn-primary" id="submitBtn">
+                    Sign In & Continue to Payment
+                </button>
+            </form>
+            
+            <div class="register-link">
+                Don't have an account? <a href="/auth/register?plan={plan}">Create one</a>
+            </div>
+        </div>
+        
+        <script>
+            document.getElementById('loginForm').addEventListener('submit', async function(e) {{
+                e.preventDefault();
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const messageDiv = document.getElementById('message');
+                const submitBtn = document.getElementById('submitBtn');
+                
+                // Clear previous messages
+                messageDiv.innerHTML = '';
+                
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+                
+                try {{
+                    const response = await fetch('/auth/login', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json'
+                        }},
+                        body: JSON.stringify({{
+                            email: email,
+                            password: password
+                        }})
+                    }});
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {{
+                        messageDiv.innerHTML = '<div class="success">Sign in successful! Redirecting to payment...</div>';
+                        
+                        // Redirect to subscription route
+                        setTimeout(() => {{
+                            window.location.href = '/subscribe/{plan}';
+                        }}, 1500);
+                    }} else {{
+                        throw new Error(data.detail || 'Login failed');
+                    }}
+                }} catch (error) {{
+                    let errorMessage = error.message;
+                    if (error.message.includes('Invalid email or password')) {{
+                        errorMessage = 'Invalid email or password. If you purchased a subscription, make sure to use the same email address you used for payment.';
+                    }}
+                    messageDiv.innerHTML = `<div class="error">${{errorMessage}}</div>`;
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Sign In & Continue to Payment';
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 @app.post("/auth/login")
 async def login_user(login: UserLogin):
@@ -2264,10 +2802,15 @@ def get_pricing():
     }
 
 @app.get("/subscribe/{plan_type}")
-async def subscribe_redirect(plan_type: str, request: Request):
-    """Direct redirect to Stripe Payment Links - SIMPLIFIED"""
+async def subscribe_redirect(plan_type: str, request: Request, current_user = Depends(get_current_user_optional)):
+    """Protected subscription - requires account creation with password"""
     
-    # Direct Payment Links from your Stripe Dashboard
+    # If user is not logged in, redirect to registration page with plan pre-selected
+    if not current_user:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=f"/auth/register?plan={plan_type}", status_code=302)
+    
+    # User is logged in - redirect to Stripe Payment Links
     payment_links = {
         "student": "https://buy.stripe.com/4gM14m11zaRk2ELcT6e3e04",    # $4.99 CAD/month
         "growth": "https://buy.stripe.com/4gMeVcfWt4sW7Z5cT6e3e05",     # $19.99 CAD/month  
@@ -2275,7 +2818,7 @@ async def subscribe_redirect(plan_type: str, request: Request):
     }
     
     checkout_url = payment_links.get(plan_type.lower(), payment_links["student"])
-    print(f"🔥 Redirecting to Stripe Payment Link: {checkout_url}")
+    print(f"🔥 User {current_user.email} redirecting to Stripe Payment Link: {checkout_url}")
     
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=checkout_url, status_code=302)
