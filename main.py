@@ -1564,6 +1564,7 @@ def pricing_page():
             }
             
             // Stripe Checkout Integration - Fixed version
+            // Fixed JavaScript syntax - removed double curly braces
             function createCheckout(planType, buttonElement) {
                 console.log('🔥 CHECKOUT: Function called with planType:', planType);
                 
