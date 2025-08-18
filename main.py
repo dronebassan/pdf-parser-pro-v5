@@ -2114,12 +2114,13 @@ def get_pricing():
 async def create_checkout_session(request: CheckoutRequest):
     """Create Stripe checkout session for subscription"""
     
-    # Debug logging
-    print(f"🔥 Checkout request received: {request}")
-    print(f"🔥 Stripe service status: {stripe_service is not None}")
-    
-    if not stripe_service:
-        print("❌ Stripe service is None - FORCING direct Stripe integration")
+    try:
+        # Debug logging
+        print(f"🔥 Checkout request received: {request}")
+        print(f"🔥 Stripe service status: {stripe_service is not None}")
+        
+        if not stripe_service:
+            print("❌ Stripe service is None - FORCING direct Stripe integration")
         # FORCE direct Stripe initialization using environment variables
         try:
             import stripe
@@ -2232,29 +2233,63 @@ async def create_checkout_session(request: CheckoutRequest):
                 }
             }
     
-    try:
-        # Validate plan type
-        plan_type = PlanType(request.plan_type.lower())
-        print(f"🔥 Plan type validated: {plan_type}")
-    except ValueError as e:
-        print(f"❌ Invalid plan type: {request.plan_type}")
-        raise HTTPException(status_code=400, detail=f"Invalid plan type: {request.plan_type}")
+        try:
+            # Validate plan type
+            plan_type = PlanType(request.plan_type.lower())
+            print(f"🔥 Plan type validated: {plan_type}")
+        except ValueError as e:
+            print(f"❌ Invalid plan type: {request.plan_type}")
+            raise HTTPException(status_code=400, detail=f"Invalid plan type: {request.plan_type}")
+        
+        print(f"🔥 Creating checkout session for {plan_type}")
+        result = stripe_service.create_checkout_session(
+            plan_type=plan_type,
+            customer_email=request.customer_email,
+            success_url=request.success_url,
+            cancel_url=request.cancel_url
+        )
+        
+        print(f"🔥 Checkout result: {result}")
+        
+        if not result["success"]:
+            print(f"❌ Checkout failed: {result['error']}")
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return result
     
-    print(f"🔥 Creating checkout session for {plan_type}")
-    result = stripe_service.create_checkout_session(
-        plan_type=plan_type,
-        customer_email=request.customer_email,
-        success_url=request.success_url,
-        cancel_url=request.cancel_url
-    )
-    
-    print(f"🔥 Checkout result: {result}")
-    
-    if not result["success"]:
-        print(f"❌ Checkout failed: {result['error']}")
-        raise HTTPException(status_code=400, detail=result["error"])
-    
-    return result
+    except Exception as outer_error:
+        # Comprehensive error catching for ANY error in the entire function
+        error_msg = str(outer_error)
+        error_type = type(outer_error).__name__
+        print(f"❌ CHECKOUT ENDPOINT ERROR: {error_type}: {error_msg}")
+        
+        # Extract detailed error information for all types of errors
+        error_details = {
+            "error_type": error_type,
+            "error_message": error_msg,
+            "api_key_present": bool(os.getenv("STRIPE_SECRET_KEY")),
+            "api_key_length": len(os.getenv("STRIPE_SECRET_KEY", "")),
+            "api_key_starts": (os.getenv("STRIPE_SECRET_KEY") or "")[:15]
+        }
+        
+        # Special handling for Stripe errors
+        if hasattr(outer_error, 'user_message'):
+            error_details["stripe_user_message"] = outer_error.user_message
+        if hasattr(outer_error, 'code'):
+            error_details["stripe_code"] = outer_error.code
+        if hasattr(outer_error, 'type'):
+            error_details["stripe_type"] = outer_error.type
+        if hasattr(outer_error, 'json_body'):
+            error_details["stripe_json_body"] = outer_error.json_body
+            
+        # Log all details
+        print(f"🔍 Error details: {error_details}")
+        
+        # Return detailed error for debugging
+        raise HTTPException(
+            status_code=500, 
+            detail=f"CHECKOUT ERROR: {error_type}: {error_msg} | Details: {error_details}"
+        )
 
 @app.post("/customer-portal/")
 async def customer_portal(customer_id: str, return_url: str = "https://your-domain.com"):
