@@ -2337,36 +2337,39 @@ async def create_checkout_session(request: CheckoutRequest):
                 
             except Exception as e:
                 print(f"❌ Stripe checkout failed: {type(e).__name__}: {e}")
+                print(f"🔍 Full error object: {e}")
+                print(f"🔍 Error args: {e.args}")
+                print(f"🔍 Error dir: {[attr for attr in dir(e) if not attr.startswith('_')]}")
                 
-                # Extract detailed Stripe error information
-                error_details = {
-                    "error_type": type(e).__name__,
-                    "error_message": str(e),
-                }
+                # Import stripe errors to check specific types
+                try:
+                    import stripe.error
+                    if isinstance(e, stripe.error.StripeError):
+                        print(f"✅ This is a StripeError")
+                        print(f"   Error message: {e._message}")
+                        print(f"   Error code: {e.code}")
+                        print(f"   Error param: {e.param}")
+                        print(f"   Error type: {e.type}")
+                        if hasattr(e, 'json_body'):
+                            print(f"   JSON body: {e.json_body}")
+                        
+                        # Use the actual Stripe error message
+                        actual_error = f"Stripe Error: {e._message} (Code: {e.code}, Type: {e.type})"
+                        raise HTTPException(status_code=500, detail=actual_error)
+                except ImportError:
+                    pass
                 
-                # Get Stripe-specific error details if available
-                if hasattr(e, 'user_message'):
-                    error_details["stripe_user_message"] = e.user_message
-                if hasattr(e, 'code'):
-                    error_details["stripe_code"] = e.code
-                if hasattr(e, 'type'):
-                    error_details["stripe_type"] = e.type
-                if hasattr(e, 'json_body'):
-                    error_details["stripe_json_body"] = e.json_body
-                if hasattr(e, 'http_status'):
-                    error_details["http_status"] = e.http_status
-                    
-                print(f"🔍 Detailed error info: {error_details}")
+                # Fallback error handling
+                print(f"🔍 Raw error string: '{str(e)}'")
+                print(f"🔍 Raw error repr: {repr(e)}")
                 
-                # Return the actual Stripe error message
-                if hasattr(e, 'user_message') and e.user_message:
-                    error_msg = e.user_message
-                elif hasattr(e, 'json_body') and e.json_body:
-                    error_msg = str(e.json_body)
+                # If it's still empty, there's a deeper issue
+                if str(e) == "":
+                    error_msg = f"Unknown Stripe Error - Type: {type(e).__name__}, Args: {e.args}"
                 else:
                     error_msg = str(e)
                     
-                raise HTTPException(status_code=500, detail=f"STRIPE ERROR: {error_msg}")
+                raise HTTPException(status_code=500, detail=f"DEBUG ERROR: {error_msg}")
     
         try:
             # Validate plan type
