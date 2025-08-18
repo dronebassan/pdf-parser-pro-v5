@@ -1916,7 +1916,10 @@ async def login_user(login: UserLogin):
         # Verify email and password
         customer = auth_system.authenticate_password(login.email, login.password)
         if not customer:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
+            raise HTTPException(
+                status_code=401, 
+                detail="Invalid email or password. If you purchased a subscription, make sure to use the same email address you used for payment."
+            )
         
         # Get usage info if available
         usage_info = {}
@@ -2342,7 +2345,7 @@ async def stripe_webhook(request: Request):
         event = json.loads(payload)
         print(f"📨 Webhook received: {event.get('type', 'unknown')}")
         
-        # Simple processing without complex imports
+        # Handle payment completion - upgrade matching email accounts
         if event['type'] == 'checkout.session.completed':
             session = event['data']['object']
             customer_email = session.get('customer_details', {}).get('email')
@@ -2350,7 +2353,7 @@ async def stripe_webhook(request: Request):
             if customer_email:
                 print(f"💳 Payment completed for: {customer_email}")
                 
-                # Basic plan detection from amount
+                # Determine plan from amount
                 amount = session.get('amount_total', 0) / 100
                 plan = "student"
                 if amount >= 49:
@@ -2358,14 +2361,12 @@ async def stripe_webhook(request: Request):
                 elif amount >= 19:
                     plan = "growth"
                 
-                print(f"✅ User {customer_email} should be upgraded to {plan} plan")
-                
-                # Actually upgrade the account
+                # Upgrade account if email matches existing user
                 if auth_system:
                     try:
                         existing_customer = auth_system.get_customer_by_email(customer_email)
                         if existing_customer:
-                            print(f"🔄 Upgrading {customer_email} to {plan} plan")
+                            print(f"✅ Found matching account! Upgrading {customer_email} to {plan}")
                             
                             # Update subscription tier
                             try:
@@ -2377,40 +2378,14 @@ async def stripe_webhook(request: Request):
                                 }
                                 tier = tier_map[plan]
                                 api_key_manager.update_customer_subscription(existing_customer.customer_id, tier)
-                                print(f"✅ Successfully upgraded {customer_email} to {tier.value}")
+                                print(f"🎯 Successfully upgraded {customer_email} to {tier.value} tier")
                             except Exception as tier_error:
                                 print(f"❌ Tier upgrade failed: {tier_error}")
-                            
-                            # Update usage limits
-                            if usage_tracker:
-                                try:
-                                    from datetime import datetime, timedelta
-                                    plan_limits = {
-                                        "student": 500,
-                                        "growth": 2500,
-                                        "business": 10000
-                                    }
-                                    pages = plan_limits[plan]
-                                    
-                                    cycle_start = datetime.now()
-                                    cycle_end = cycle_start + timedelta(days=30)
-                                    
-                                    usage_tracker.update_user_limits(
-                                        user_id=existing_customer.customer_id,
-                                        subscription_id=session.get('subscription', ''),
-                                        plan_type=plan,
-                                        pages_included=pages,
-                                        overage_rate=0.01,
-                                        billing_cycle_start=cycle_start,
-                                        billing_cycle_end=cycle_end
-                                    )
-                                    print(f"✅ Usage limits set: {pages} pages/month")
-                                except Exception as usage_error:
-                                    print(f"❌ Usage tracking failed: {usage_error}")
                         else:
-                            print(f"❌ No account found for {customer_email}")
+                            print(f"📋 Payment received but no account found for {customer_email}")
+                            print(f"💡 User must register with email {customer_email} to access paid features")
                     except Exception as e:
-                        print(f"⚠️  Account upgrade failed: {e}")
+                        print(f"⚠️  Account upgrade process failed: {e}")
         
         return {"status": "success", "message": "webhook processed"}
         
