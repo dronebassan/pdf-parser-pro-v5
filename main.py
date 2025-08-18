@@ -543,6 +543,166 @@ def home():
             .hidden {{
                 display: none;
             }}
+            
+            /* Enhanced Login Section */
+            .login-container {{
+                margin-top: 3rem;
+                display: flex;
+                justify-content: center;
+                padding: 0 1rem;
+            }}
+            
+            .login-card {{
+                background: var(--background);
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius-lg);
+                padding: 2rem;
+                max-width: 400px;
+                width: 100%;
+                box-shadow: var(--shadow-lg);
+                transition: var(--transition);
+            }}
+            
+            .login-card:hover {{
+                box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
+            }}
+            
+            .login-header {{
+                text-align: center;
+                margin-bottom: 2rem;
+            }}
+            
+            .login-header i {{
+                font-size: 3rem;
+                color: var(--primary-color);
+                margin-bottom: 1rem;
+                display: block;
+            }}
+            
+            .login-header h3 {{
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+            }}
+            
+            .login-header p {{
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+            }}
+            
+            .login-form {{
+                margin-bottom: 1.5rem;
+            }}
+            
+            .form-group {{
+                margin-bottom: 1.5rem;
+            }}
+            
+            .form-group label {{
+                display: block;
+                margin-bottom: 0.5rem;
+                font-weight: 500;
+                color: var(--text-primary);
+                font-size: 0.875rem;
+            }}
+            
+            .form-group input {{
+                width: 100%;
+                padding: 0.75rem 1rem;
+                border: 2px solid var(--border-color);
+                border-radius: var(--border-radius);
+                font-size: 1rem;
+                transition: var(--transition);
+                background: var(--background);
+            }}
+            
+            .form-group input:focus {{
+                outline: none;
+                border-color: var(--primary-color);
+                box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
+            }}
+            
+            .form-group input:hover {{
+                border-color: var(--border-hover);
+            }}
+            
+            .error-message {{
+                background: #fef2f2;
+                border: 1px solid #fecaca;
+                color: #dc2626;
+                padding: 0.75rem 1rem;
+                border-radius: var(--border-radius);
+                margin-bottom: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 0.875rem;
+                animation: shake 0.5s ease-in-out;
+            }}
+            
+            @keyframes shake {{
+                0%, 100% {{ transform: translateX(0); }}
+                25% {{ transform: translateX(-5px); }}
+                75% {{ transform: translateX(5px); }}
+            }}
+            
+            .login-btn {{
+                width: 100%;
+                background: var(--primary-color);
+                color: white;
+                padding: 0.875rem 1.5rem;
+                border: none;
+                border-radius: var(--border-radius);
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: var(--transition);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+            }}
+            
+            .login-btn:hover {{
+                background: var(--primary-hover);
+                transform: translateY(-1px);
+                box-shadow: var(--shadow-md);
+            }}
+            
+            .login-btn:active {{
+                transform: translateY(0);
+            }}
+            
+            .login-footer {{
+                text-align: center;
+                padding-top: 1.5rem;
+                border-top: 1px solid var(--border-color);
+            }}
+            
+            .login-footer p {{
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+                margin-bottom: 1rem;
+            }}
+            
+            .signup-link {{
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                color: var(--primary-color);
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 0.875rem;
+                padding: 0.5rem 1rem;
+                border-radius: var(--border-radius);
+                transition: var(--transition);
+            }}
+            
+            .signup-link:hover {{
+                background: var(--background-secondary);
+                transform: translateY(-1px);
+            }}
         </style>
     </head>
     <body>
@@ -615,18 +775,45 @@ def home():
                     </div>
                 </div>
                 
-                <!-- Quick Login Section -->
-                <div id="login-section" style="margin-top: 2rem; text-align: center;">
-                    <div style="background: var(--background-secondary); padding: 1rem; border-radius: var(--border-radius);">
-                        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Have an account?</h4>
-                        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                            <input type="email" id="loginEmail" placeholder="Email" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius);">
-                            <input type="password" id="loginPassword" placeholder="Password" style="flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius);">
+                <!-- Enhanced Login Section -->
+                <div id="login-section" class="login-container">
+                    <div class="login-card">
+                        <div class="login-header">
+                            <i class="fas fa-user-circle"></i>
+                            <h3>Welcome Back</h3>
+                            <p>Sign in to access unlimited processing</p>
                         </div>
-                        <button onclick="quickLogin()" class="btn-primary" style="font-size: 0.875rem; padding: 0.5rem 1.5rem;">Login for Unlimited Processing</button>
-                        <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.5rem;">
-                            Don't have an account? <a href="/pricing" style="color: var(--primary-color);">Get started for $6.99 CAD/month</a>
-                        </p>
+                        
+                        <form class="login-form" onsubmit="quickLogin(event)">
+                            <div class="form-group">
+                                <label for="loginEmail">Email Address</label>
+                                <input type="email" id="loginEmail" placeholder="Enter your email" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="loginPassword">Password</label>
+                                <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                            </div>
+                            
+                            <!-- Error Message Area -->
+                            <div id="login-error" class="error-message" style="display: none;">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <span id="login-error-text"></span>
+                            </div>
+                            
+                            <button type="submit" class="login-btn">
+                                <i class="fas fa-sign-in-alt"></i>
+                                Sign In
+                            </button>
+                        </form>
+                        
+                        <div class="login-footer">
+                            <p>Don't have an account?</p>
+                            <a href="/pricing" class="signup-link">
+                                <i class="fas fa-rocket"></i>
+                                Get started for $6.99 CAD/month
+                            </a>
+                        </div>
                     </div>
                 </div>
                 
@@ -724,15 +911,29 @@ def home():
                 }}
             }}
             
-            // Quick login functionality
-            async function quickLogin() {{
+            // Enhanced login functionality with error handling
+            async function quickLogin(event) {{
+                event.preventDefault(); // Prevent form submission
+                
                 const email = document.getElementById('loginEmail').value;
                 const password = document.getElementById('loginPassword').value;
+                const errorDiv = document.getElementById('login-error');
+                const errorText = document.getElementById('login-error-text');
+                const submitBtn = event.target.querySelector('button[type="submit"]');
                 
+                // Hide previous errors
+                hideLoginError();
+                
+                // Basic validation
                 if (!email || !password) {{
-                    alert('Please enter both email and password');
+                    showLoginError('Please enter both email and password');
                     return;
                 }}
+                
+                // Show loading state
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+                submitBtn.disabled = true;
                 
                 try {{
                     const response = await fetch('/auth/login', {{
@@ -748,14 +949,46 @@ def home():
                         localStorage.setItem('pdf_parser_email', email);
                         localStorage.setItem('pdf_parser_logged_in', 'true');
                         
-                        showLoggedInState();
-                        alert('Login successful! You now have unlimited processing.');
+                        // Show success (brief)
+                        submitBtn.innerHTML = '<i class="fas fa-check"></i> Success!';
+                        submitBtn.style.background = 'var(--success-color)';
+                        
+                        // Transition to logged in state
+                        setTimeout(() => {{
+                            showLoggedInState();
+                        }}, 1000);
                     }} else {{
-                        alert('Login failed: ' + result.message);
+                        showLoginError(result.message || 'Invalid email or password');
                     }}
                 }} catch (error) {{
-                    alert('Login failed: ' + error.message);
+                    showLoginError('Connection error. Please try again.');
+                    console.error('Login error:', error);
+                }} finally {{
+                    // Reset button after delay
+                    setTimeout(() => {{
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                        submitBtn.style.background = '';
+                    }}, 2000);
                 }}
+            }}
+            
+            // Show login error message
+            function showLoginError(message) {{
+                const errorDiv = document.getElementById('login-error');
+                const errorText = document.getElementById('login-error-text');
+                
+                errorText.textContent = message;
+                errorDiv.style.display = 'flex';
+                
+                // Auto-hide after 5 seconds
+                setTimeout(hideLoginError, 5000);
+            }}
+            
+            // Hide login error message
+            function hideLoginError() {{
+                const errorDiv = document.getElementById('login-error');
+                errorDiv.style.display = 'none';
             }}
             
             // Show logged in state
