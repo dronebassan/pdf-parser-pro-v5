@@ -2763,38 +2763,37 @@ async def parse_pdf_advanced(
             tmp_file.write(content)
             tmp_path = tmp_file.name
         
-        # Get accurate "page equivalent" count based on content density
+        # Calculate "pages" based PURELY on character count for accurate billing
         try:
             doc = fitz.open(tmp_path)
-            actual_pages = len(doc)
+            actual_pdf_pages = len(doc)
             
-            # Extract all text to measure content density
+            # Extract all text to measure actual content
             total_text = ""
-            for page_num in range(actual_pages):
+            for page_num in range(actual_pdf_pages):
                 page = doc[page_num]
                 total_text += page.get_text()
             
             doc.close()
             
-            # Calculate "processing units" based on content
-            # Average page = ~2000 characters, but adjust for density
+            # PURE CHARACTER-BASED BILLING
+            # 1 "page" = exactly 2000 characters of content
+            CHARS_PER_PAGE = 2000
             char_count = len(total_text.strip())
             
             if char_count == 0:
-                # No text (images only) - charge for actual pages
-                pages_processed = actual_pages
+                # No extractable text (pure images/scanned docs)
+                pages_processed = actual_pdf_pages  # Fall back to physical pages
+                print(f"📊 Image/Scanned document: {actual_pdf_pages} physical pages → {pages_processed} billing pages")
             else:
-                # Calculate content-based "page equivalents"
-                # Standard: 1800 chars = 1 processing unit (slightly conservative)
-                content_pages = max(1, char_count // 1800)
+                # Pure character-based billing - extremely accurate
+                pages_processed = max(1, (char_count + CHARS_PER_PAGE - 1) // CHARS_PER_PAGE)  # Ceiling division
                 
-                # Use whichever is higher: actual pages OR content density
-                # This prevents gaming while being fair for normal docs
-                pages_processed = max(actual_pages, content_pages)
-                
-                print(f"📊 Processing analysis: {actual_pages} pages, {char_count} chars → {pages_processed} units")
-        except:
-            pages_processed = 1  # Fallback
+                print(f"📊 Character-based billing: {char_count} chars ÷ {CHARS_PER_PAGE} = {pages_processed} billing pages")
+                print(f"    (Physical PDF pages: {actual_pdf_pages})")
+        except Exception as e:
+            print(f"⚠️  Page calculation failed: {e}")
+            pages_processed = 1  # Safe fallback
         
         # Check usage limits and permissions
         if current_user and usage_tracker:
