@@ -912,15 +912,105 @@ def home():
                             }, 100);
                         }
                         
-                        // Show results with user info
-                        let displayResult = {
-                            success: result.success,
-                            text: result.text,
-                            pages_processed: result.pages_processed,
-                            strategy_used: result.strategy_used,
-                            user_info: result.user_info
-                        };
-                        resultsContent.textContent = JSON.stringify(displayResult, null, 2);
+                        // Display clean, user-friendly content
+                        resultsContent.innerHTML = '';
+                        
+                        // Add text content
+                        if (result.text && result.text.trim()) {
+                            const textSection = document.createElement('div');
+                            textSection.style.cssText = `
+                                background: white;
+                                border: 1px solid #e0e0e0;
+                                border-radius: 8px;
+                                padding: 20px;
+                                margin-bottom: 20px;
+                                line-height: 1.6;
+                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                white-space: pre-wrap;
+                                word-wrap: break-word;
+                            `;
+                            
+                            const textHeader = document.createElement('h3');
+                            textHeader.textContent = '📄 Extracted Text';
+                            textHeader.style.cssText = 'margin: 0 0 15px 0; color: #333; font-size: 18px;';
+                            
+                            const textContent = document.createElement('div');
+                            textContent.textContent = result.text.trim();
+                            textContent.style.cssText = 'color: #444; font-size: 14px;';
+                            
+                            textSection.appendChild(textHeader);
+                            textSection.appendChild(textContent);
+                            resultsContent.appendChild(textSection);
+                        }
+                        
+                        // Add tables if present
+                        if (result.tables && result.tables.length > 0) {
+                            const tablesSection = document.createElement('div');
+                            tablesSection.style.cssText = `
+                                background: white;
+                                border: 1px solid #e0e0e0;
+                                border-radius: 8px;
+                                padding: 20px;
+                                margin-bottom: 20px;
+                            `;
+                            
+                            const tablesHeader = document.createElement('h3');
+                            tablesHeader.textContent = `📊 Tables (${result.tables.length})`;
+                            tablesHeader.style.cssText = 'margin: 0 0 15px 0; color: #333; font-size: 18px;';
+                            tablesSection.appendChild(tablesHeader);
+                            
+                            result.tables.forEach((table, index) => {
+                                const tableDiv = document.createElement('div');
+                                tableDiv.style.cssText = 'margin-bottom: 20px; overflow-x: auto;';
+                                
+                                const tableTitle = document.createElement('h4');
+                                tableTitle.textContent = `Table ${index + 1}`;
+                                tableTitle.style.cssText = 'margin: 0 0 10px 0; color: #555;';
+                                
+                                const tableContent = document.createElement('pre');
+                                tableContent.textContent = JSON.stringify(table, null, 2);
+                                tableContent.style.cssText = `
+                                    background: #f8f9fa;
+                                    padding: 15px;
+                                    border-radius: 4px;
+                                    font-size: 12px;
+                                    overflow-x: auto;
+                                `;
+                                
+                                tableDiv.appendChild(tableTitle);
+                                tableDiv.appendChild(tableContent);
+                                tablesSection.appendChild(tableDiv);
+                            });
+                            
+                            resultsContent.appendChild(tablesSection);
+                        }
+                        
+                        // Add images if present
+                        if (result.images && result.images.length > 0) {
+                            const imagesSection = document.createElement('div');
+                            imagesSection.style.cssText = `
+                                background: white;
+                                border: 1px solid #e0e0e0;
+                                border-radius: 8px;
+                                padding: 20px;
+                                margin-bottom: 20px;
+                            `;
+                            
+                            const imagesHeader = document.createElement('h3');
+                            imagesHeader.textContent = `🖼️ Images (${result.images.length})`;
+                            imagesHeader.style.cssText = 'margin: 0 0 15px 0; color: #333; font-size: 18px;';
+                            imagesSection.appendChild(imagesHeader);
+                            
+                            result.images.forEach((image, index) => {
+                                const imageDiv = document.createElement('div');
+                                imageDiv.textContent = `Image ${index + 1}: ${image.description || 'Extracted image'}`;
+                                imageDiv.style.cssText = 'margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px;';
+                                imagesSection.appendChild(imageDiv);
+                            });
+                            
+                            resultsContent.appendChild(imagesSection);
+                        }
+                        
                         resultsEl.classList.add('active');
                         
                         // Show upgrade prompt if free user hit limit
