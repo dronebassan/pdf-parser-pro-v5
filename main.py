@@ -1468,7 +1468,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> All advanced features</li>
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
-                    <a href="#" class="plan-button secondary">Get Started</a>
+                    <button onclick="createCheckout('student')" class="plan-button secondary">Get Started</button>
                 </div>
 
                 <div class="pricing-card popular">
@@ -1486,7 +1486,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Chat support</li>
                         <li><i class="fas fa-check"></i> API access</li>
                     </ul>
-                    <a href="#" class="plan-button">Get Started</a>
+                    <button onclick="createCheckout('growth')" class="plan-button">Get Started</button>
                 </div>
 
                 <div class="pricing-card">
@@ -1505,7 +1505,7 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Full API access</li>
                         <li><i class="fas fa-check"></i> Custom integrations</li>
                     </ul>
-                    <a href="#" class="plan-button">Get Started</a>
+                    <button onclick="createCheckout('business')" class="plan-button">Get Started</button>
                 </div>
             </section>
 
@@ -1534,6 +1534,50 @@ def pricing_page():
                 </div>
             </section>
         </main>
+        
+        <script>
+            // Stripe Checkout Integration
+            async function createCheckout(planType) {{
+                const button = event.target;
+                const originalText = button.textContent;
+                
+                // Show loading state
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+                button.disabled = true;
+                
+                try {{
+                    const response = await fetch('/create-checkout-session/', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }},
+                        body: JSON.stringify({{
+                            plan_type: planType,
+                            customer_email: '', // Will be collected by Stripe
+                            success_url: window.location.origin + '/success?session_id={{CHECKOUT_SESSION_ID}}',
+                            cancel_url: window.location.origin + '/pricing'
+                        }})
+                    }});
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {{
+                        // Redirect to Stripe checkout
+                        window.location.href = data.checkout_url;
+                    }} else {{
+                        alert('Error creating checkout session: ' + (data.error || 'Please try again'));
+                        console.error('Checkout error:', data);
+                    }}
+                }} catch (error) {{
+                    alert('Connection error. Please try again.');
+                    console.error('Network error:', error);
+                }} finally {{
+                    // Reset button
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }}
+            }}
+        </script>
     </body>
     </html>
     """
