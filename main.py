@@ -1469,7 +1469,8 @@ def pricing_page():
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
                     <button onclick="createCheckout('student', this)" class="plan-button secondary">Get Started</button>
-                    <button onclick="testButton('student')" style="width: 100%; margin-top: 0.5rem; padding: 0.5rem; background: #orange; color: white; border: none; border-radius: 4px;">🔥 TEST BUTTON</button>
+                    <button onclick="alert('BASIC TEST WORKS!')" style="width: 100%; margin-top: 0.5rem; padding: 0.5rem; background: orange; color: white; border: none; border-radius: 4px; cursor: pointer;">🔥 BASIC TEST</button>
+                    <button onclick="testButton('student')" style="width: 100%; margin-top: 0.5rem; padding: 0.5rem; background: red; color: white; border: none; border-radius: 4px; cursor: pointer;">🔥 FUNCTION TEST</button>
                 </div>
 
                 <div class="pricing-card popular">
@@ -1537,75 +1538,127 @@ def pricing_page():
         </main>
         
         <script>
-            // Test function first
-            async function testButton(planType) {{
+            // Debug: Check if script is loading
+            console.log('🔥 PRICING: Script loaded successfully!');
+            
+            // Test function first - simpler implementation
+            function testButton(planType) {{
                 console.log('🔥 TEST: Button clicked for plan:', planType);
-                alert('Button is working! Plan: ' + planType);
+                alert('✅ SUCCESS! Button is working for plan: ' + planType);
                 
-                try {{
-                    const response = await fetch('/test-button/', {{
-                        method: 'POST',
-                        headers: {{'Content-Type': 'application/json'}},
-                        body: JSON.stringify({{plan: planType, test: true}})
-                    }});
-                    const result = await response.json();
+                // Test fetch to ensure network connectivity
+                fetch('/test-button/', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{plan: planType, test: true, timestamp: new Date().toISOString()}})
+                }})
+                .then(function(response) {{ return response.json(); }})
+                .then(function(result) {{
                     console.log('🔥 TEST: Server response:', result);
-                }} catch (error) {{
+                    alert('✅ Server Response: ' + JSON.stringify(result, null, 2));
+                }})
+                .catch(function(error) {{
                     console.error('🔥 TEST: Error:', error);
-                }}
+                    alert('❌ Network Error: ' + error.message);
+                }});
             }}
             
-            // Stripe Checkout Integration
-            async function createCheckout(planType, buttonElement) {{
-                console.log('🔥 createCheckout called with:', planType);
+            // Stripe Checkout Integration - Fixed version
+            function createCheckout(planType, buttonElement) {{
+                console.log('🔥 CHECKOUT: Function called with planType:', planType);
                 
-                const button = buttonElement || event.target;
-                const originalText = button.textContent;
+                // Get button element safely
+                var button = buttonElement;
+                if (!button && window.event && window.event.target) {{
+                    button = window.event.target;
+                }}
+                if (!button) {{
+                    console.error('❌ CHECKOUT: No button element found');
+                    alert('Error: Could not find button element');
+                    return;
+                }}
+                
+                var originalText = button.textContent;
                 
                 // Show loading state
                 button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
                 button.disabled = true;
                 
-                console.log('Button loading state set');
+                console.log('🔥 CHECKOUT: Button loading state set');
                 
-                try {{
-                    console.log('Making fetch request to /create-checkout-session/');
+                // Prepare checkout data - FIXED template string issue
+                var checkoutData = {{
+                    plan_type: planType,
+                    customer_email: '',
+                    success_url: window.location.origin + '/success?session_id=' + '{{CHECKOUT_SESSION_ID}}',
+                    cancel_url: window.location.origin + '/pricing'
+                }};
+                
+                console.log('🔥 CHECKOUT: Request data:', checkoutData);
+                
+                fetch('/create-checkout-session/', {{
+                    method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json',
+                    }},
+                    body: JSON.stringify(checkoutData)
+                }})
+                .then(function(response) {{
+                    console.log('🔥 CHECKOUT: Response status:', response.status);
+                    return response.json();
+                }})
+                .then(function(data) {{
+                    console.log('🔥 CHECKOUT: Response data:', data);
                     
-                    const response = await fetch('/create-checkout-session/', {{
-                        method: 'POST',
-                        headers: {{
-                            'Content-Type': 'application/json',
-                        }},
-                        body: JSON.stringify({{
-                            plan_type: planType,
-                            customer_email: '', // Will be collected by Stripe
-                            success_url: window.location.origin + '/success?session_id=' + '{' + 'CHECKOUT_SESSION_ID' + '}',
-                            cancel_url: window.location.origin + '/pricing'
-                        }})
-                    }});
-                    
-                    console.log('Response status:', response.status);
-                    
-                    const data = await response.json();
-                    console.log('Response data:', data);
-                    
-                    if (data.success) {{
-                        console.log('Redirecting to:', data.checkout_url);
-                        // Redirect to Stripe checkout
+                    if (data.success && data.checkout_url) {{
+                        console.log('🔥 CHECKOUT: Redirecting to:', data.checkout_url);
                         window.location.href = data.checkout_url;
                     }} else {{
-                        alert('Error creating checkout session: ' + (data.error || 'Please try again'));
-                        console.error('Checkout error:', data);
+                        var errorMsg = data.error || data.detail || 'Unknown error occurred';
+                        alert('❌ Checkout Error: ' + errorMsg);
+                        console.error('❌ CHECKOUT: Error:', data);
                     }}
-                }} catch (error) {{
-                    alert('Connection error. Please try again. Check console for details.');
-                    console.error('Network error:', error);
-                }} finally {{
-                    // Reset button
+                }})
+                .catch(function(error) {{
+                    console.error('❌ CHECKOUT: Network error:', error);
+                    alert('❌ Connection Error: ' + error.message + '\\n\\nPlease check your internet connection and try again.');
+                }})
+                .finally(function() {{
+                    // Reset button state
                     button.innerHTML = originalText;
                     button.disabled = false;
-                }}
+                    console.log('🔥 CHECKOUT: Button state reset');
+                }});
             }}
+            
+            // Initialize when DOM is ready
+            document.addEventListener('DOMContentLoaded', function() {{
+                console.log('🔥 PRICING: DOM loaded, page ready');
+                
+                // Test that all functions are available
+                if (typeof testButton === 'function') {{
+                    console.log('✅ testButton function available');
+                }} else {{
+                    console.error('❌ testButton function missing');
+                }}
+                
+                if (typeof createCheckout === 'function') {{
+                    console.log('✅ createCheckout function available');
+                }} else {{
+                    console.error('❌ createCheckout function missing');
+                }}
+            }});
+            
+            // Global error handler for debugging
+            window.addEventListener('error', function(event) {{
+                console.error('🔥 GLOBAL ERROR:', event.error);
+                console.error('🔥 ERROR DETAILS:', {{
+                    message: event.message,
+                    filename: event.filename,
+                    lineno: event.lineno,
+                    colno: event.colno
+                }});
+            }});
         </script>
     </body>
     </html>

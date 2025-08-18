@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Fixed Pricing Page JavaScript</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 20px; 
+            line-height: 1.6;
+        }
+        .test-section { 
+            background: #f5f5f5; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px; 
+        }
+        button { 
+            background: #2563eb; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 5px;
+        }
+        .orange-btn {
+            background: orange;
+        }
+        button:hover { opacity: 0.9; }
+        .log { 
+            background: #1f2937; 
+            color: #10b981; 
+            padding: 15px; 
+            border-radius: 5px; 
+            font-family: monospace; 
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Pricing Page JavaScript Test</h1>
+    <p>This page tests the fixed JavaScript functions from the pricing page.</p>
+    
+    <div class="test-section">
+        <h2>🔥 Test Button (Orange Button Fix)</h2>
+        <p>This tests the orange test button functionality:</p>
+        <button onclick="testButton('student')" class="orange-btn">🔥 TEST BUTTON</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>💳 Stripe Checkout Test</h2>
+        <p>This tests the "Get Started" button functionality:</p>
+        <button onclick="createCheckout('student', this)">Get Started - Student</button>
+        <button onclick="createCheckout('growth', this)">Get Started - Growth</button>
+        <button onclick="createCheckout('business', this)">Get Started - Business</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>📊 Console Log Output</h2>
+        <p>JavaScript console messages will appear here:</p>
+        <div id="console-log" class="log">Loading JavaScript functions...\n</div>
+        <button onclick="document.getElementById('console-log').innerHTML = 'Console cleared\\n';">Clear Log</button>
+    </div>
+    
+    <script>
+        // Capture console logs for display
+        const logDiv = document.getElementById('console-log');
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        
+        function addToLog(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ef4444' : '#10b981';
+            logDiv.innerHTML += `<span style="color: ${color};">[${timestamp}] ${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            addToLog(args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            addToLog('ERROR: ' + args.join(' '), 'error');
+        };
+        
+        // Copy the FIXED functions from main.py
+        // Debug: Check if script is loading
+        console.log('🔥 PRICING: Script loaded successfully!');
+        
+        // Test function first - simpler implementation  
+        function testButton(planType) {
+            console.log('🔥 TEST: Button clicked for plan:', planType);
+            alert('✅ SUCCESS! Button is working for plan: ' + planType);
+            
+            // Test fetch to ensure network connectivity
+            fetch('/test-button/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({plan: planType, test: true, timestamp: new Date().toISOString()})
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(result) {
+                console.log('🔥 TEST: Server response:', result);
+                alert('✅ Server Response: ' + JSON.stringify(result, null, 2));
+            })
+            .catch(function(error) {
+                console.error('🔥 TEST: Error:', error);
+                alert('❌ Network Error: ' + error.message);
+            });
+        }
+        
+        // Stripe Checkout Integration - Fixed version
+        function createCheckout(planType, buttonElement) {
+            console.log('🔥 CHECKOUT: Function called with planType:', planType);
+            
+            // Get button element safely
+            var button = buttonElement;
+            if (!button && window.event && window.event.target) {
+                button = window.event.target;
+            }
+            if (!button) {
+                console.error('❌ CHECKOUT: No button element found');
+                alert('Error: Could not find button element');
+                return;
+            }
+            
+            var originalText = button.textContent;
+            
+            // Show loading state
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+            button.disabled = true;
+            
+            console.log('🔥 CHECKOUT: Button loading state set');
+            
+            // Prepare checkout data - FIXED template string issue
+            var checkoutData = {
+                plan_type: planType,
+                customer_email: '',
+                success_url: window.location.origin + '/success?session_id={CHECKOUT_SESSION_ID}',
+                cancel_url: window.location.origin + '/pricing'
+            };
+            
+            console.log('🔥 CHECKOUT: Request data:', checkoutData);
+            
+            fetch('/create-checkout-session/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(checkoutData)
+            })
+            .then(function(response) {
+                console.log('🔥 CHECKOUT: Response status:', response.status);
+                return response.json();
+            })
+            .then(function(data) {
+                console.log('🔥 CHECKOUT: Response data:', data);
+                
+                if (data.success && data.checkout_url) {
+                    console.log('🔥 CHECKOUT: Redirecting to:', data.checkout_url);
+                    window.location.href = data.checkout_url;
+                } else {
+                    var errorMsg = data.error || data.detail || 'Unknown error occurred';
+                    alert('❌ Checkout Error: ' + errorMsg);
+                    console.error('❌ CHECKOUT: Error:', data);
+                }
+            })
+            .catch(function(error) {
+                console.error('❌ CHECKOUT: Network error:', error);
+                alert('❌ Connection Error: ' + error.message + '\n\nPlease check your internet connection and try again.');
+            })
+            .finally(function() {
+                // Reset button state
+                button.innerHTML = originalText;
+                button.disabled = false;
+                console.log('🔥 CHECKOUT: Button state reset');
+            });
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔥 PRICING: DOM loaded, page ready');
+            
+            // Test that all functions are available
+            if (typeof testButton === 'function') {
+                console.log('✅ testButton function available');
+            } else {
+                console.error('❌ testButton function missing');
+            }
+            
+            if (typeof createCheckout === 'function') {
+                console.log('✅ createCheckout function available');
+            } else {
+                console.error('❌ createCheckout function missing');
+            }
+        });
+        
+        // Global error handler for debugging
+        window.addEventListener('error', function(event) {
+            console.error('🔥 GLOBAL ERROR:', event.error);
+            console.error('🔥 ERROR DETAILS:', {
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno
+            });
+        });
+    </script>
+</body>
+</html>
