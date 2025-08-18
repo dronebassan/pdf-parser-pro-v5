@@ -1274,25 +1274,6 @@ def pricing_page():
                     </ul>
                     <a href="#" class="plan-button">Get Started</a>
                 </div>
-
-                <div class="pricing-card">
-                    <div class="plan-name">Enterprise</div>
-                    <div class="plan-price">
-                        <span class="currency">$</span>399.99
-                        <span class="period">/month CAD</span>
-                    </div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">Plus applicable taxes</div>
-                    <div class="plan-description">Maximum processing power and support</div>
-                    <ul class="plan-features">
-                        <li><i class="fas fa-check"></i> 50,000 pages/month</li>
-                        <li><i class="fas fa-check"></i> Dedicated processing</li>
-                        <li><i class="fas fa-check"></i> White-label options</li>
-                        <li><i class="fas fa-check"></i> 24/7 priority support</li>
-                        <li><i class="fas fa-check"></i> Custom deployment</li>
-                        <li><i class="fas fa-check"></i> SLA guarantees</li>
-                    </ul>
-                    <a href="#" class="plan-button">Contact Sales</a>
-                </div>
             </section>
 
             <!-- FAQ Section -->
@@ -1348,8 +1329,7 @@ async def register_user(registration: UserRegistration):
         tier_map = {
             "student": SubscriptionTier.STUDENT,
             "growth": SubscriptionTier.GROWTH,
-            "business": SubscriptionTier.BUSINESS,
-            "enterprise": SubscriptionTier.ENTERPRISE
+            "business": SubscriptionTier.BUSINESS
         }
         
         subscription_tier = tier_map.get(registration.plan_type.lower(), SubscriptionTier.FREE)
@@ -1368,8 +1348,7 @@ async def register_user(registration: UserRegistration):
             plan_details = {
                 "student": {"pages": 500, "rate": 0.01},
                 "growth": {"pages": 2500, "rate": 0.008},
-                "business": {"pages": 10000, "rate": 0.008},
-                "enterprise": {"pages": 50000, "rate": 0.006}
+                "business": {"pages": 10000, "rate": 0.008}
             }
             
             plan = plan_details.get(registration.plan_type.lower(), {"pages": 100, "rate": 0.02})

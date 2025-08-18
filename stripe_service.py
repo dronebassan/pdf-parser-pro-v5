@@ -19,7 +19,6 @@ class PlanType(Enum):
     STUDENT = "student"
     GROWTH = "growth"
     BUSINESS = "business"
-    ENTERPRISE = "enterprise"
 
 @dataclass
 class Plan:
@@ -90,22 +89,6 @@ class StripeService:
                 ],
                 stripe_price_id=os.getenv("STRIPE_BUSINESS_PRICE_ID", "price_1RxLk5CVZzvkFjSrSfrJfv0S"),
                 stripe_usage_price_id=os.getenv("STRIPE_BUSINESS_USAGE_PRICE_ID", "")
-            ),
-            PlanType.ENTERPRISE: Plan(
-                name="Enterprise Plan",
-                price_monthly=399.99,
-                pages_included=50000,
-                overage_rate=0.006,
-                features=[
-                    "50,000 pages/month",
-                    "Dedicated processing",
-                    "White-label options",
-                    "24/7 priority support",
-                    "Custom deployment",
-                    "SLA guarantees"
-                ],
-                stripe_price_id=os.getenv("STRIPE_ENTERPRISE_PRICE_ID", "price_1RxLkqCVZzvkFjSra9ykMxJp"),
-                stripe_usage_price_id=os.getenv("STRIPE_ENTERPRISE_USAGE_PRICE_ID", "")
             )
         }
     
