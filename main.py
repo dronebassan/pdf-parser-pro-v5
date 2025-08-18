@@ -161,8 +161,46 @@ except Exception as e:
         class SimpleAuthSystem:
             def __init__(self, secret_key: str):
                 self.secret_key = secret_key
-                self.customers = {}
-                print("✅ Using simplified authentication system")
+                self.db_file = "users.json"
+                self.customers = self._load_customers()
+                print("✅ Using simplified authentication system with persistent storage")
+            
+            def _load_customers(self):
+                """Load customers from JSON file"""
+                try:
+                    import json
+                    import os
+                    if os.path.exists(self.db_file):
+                        with open(self.db_file, 'r') as f:
+                            data = json.load(f)
+                            customers = {}
+                            for email, customer_data in data.items():
+                                customers[email] = Customer(**customer_data)
+                            print(f"📂 Loaded {len(customers)} users from {self.db_file}")
+                            return customers
+                except Exception as e:
+                    print(f"⚠️  Could not load customers: {e}")
+                return {}
+            
+            def _save_customers(self):
+                """Save customers to JSON file"""
+                try:
+                    import json
+                    data = {}
+                    for email, customer in self.customers.items():
+                        data[email] = {
+                            'customer_id': customer.customer_id,
+                            'email': customer.email,
+                            'password_hash': customer.password_hash,
+                            'api_key': customer.api_key,
+                            'subscription_tier': customer.subscription_tier,
+                            'created_at': customer.created_at
+                        }
+                    with open(self.db_file, 'w') as f:
+                        json.dump(data, f, indent=2)
+                    print(f"💾 Saved {len(self.customers)} users to {self.db_file}")
+                except Exception as e:
+                    print(f"❌ Could not save customers: {e}")
             
             def generate_api_key(self) -> str:
                 return f"pdf_parser_{secrets.token_urlsafe(32)}"
@@ -191,6 +229,7 @@ except Exception as e:
                 )
                 
                 self.customers[email] = customer
+                self._save_customers()  # Save to disk
                 return customer
             
             def authenticate_password(self, email: str, password: str) -> Optional[Customer]:
@@ -213,6 +252,7 @@ except Exception as e:
                 customer = self.get_customer_by_email(email)
                 if customer:
                     customer.subscription_tier = new_tier
+                    self._save_customers()  # Save to disk
                     return True
                 return False
         
