@@ -2261,35 +2261,19 @@ def get_pricing():
     }
 
 @app.get("/subscribe/{plan_type}")
-async def subscribe_redirect(plan_type: str, current_user = Depends(get_current_user_optional)):
-    """Protected route that redirects to payment - REQUIRES LOGIN"""
+async def subscribe_redirect(plan_type: str, request: Request):
+    """Direct redirect to Stripe Payment Links - SIMPLIFIED"""
     
-    # User must be logged in to access payment
-    if not current_user:
-        # Redirect to registration with plan selection
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=f"/pricing?register=true&plan={plan_type}", status_code=302)
-    
-    print(f"🔥 Authenticated user {current_user.email} accessing {plan_type} plan")
-    
-    # Your actual Payment Links from Stripe Dashboard  
+    # Direct Payment Links from your Stripe Dashboard
     payment_links = {
-        "student": "https://buy.stripe.com/4gM14m11zaRk2ELcT6e3e04",    # Student Plan: $4.99 CAD/month
-        "growth": "https://buy.stripe.com/4gMeVcfWt4sW7Z5cT6e3e05",     # Growth Plan: $19.99 CAD/month
-        "business": "https://buy.stripe.com/eVq9AS25D3oS5QX2ese3e06"    # Business Plan: $49.99 CAD/month
+        "student": "https://buy.stripe.com/4gM14m11zaRk2ELcT6e3e04",    # $4.99 CAD/month
+        "growth": "https://buy.stripe.com/4gMeVcfWt4sW7Z5cT6e3e05",     # $19.99 CAD/month  
+        "business": "https://buy.stripe.com/eVq9AS25D3oS5QX2ese3e06"    # $49.99 CAD/month
     }
     
     checkout_url = payment_links.get(plan_type.lower(), payment_links["student"])
+    print(f"🔥 Redirecting to Stripe Payment Link: {checkout_url}")
     
-    # Add user email as URL parameter so Stripe can pre-fill it
-    if "?" in checkout_url:
-        checkout_url += f"&prefilled_email={current_user.email}"
-    else:
-        checkout_url += f"?prefilled_email={current_user.email}"
-    
-    print(f"✅ Redirecting logged-in user {current_user.email} to: {checkout_url}")
-    
-    # Direct redirect to Stripe Payment Link
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=checkout_url, status_code=302)
 
