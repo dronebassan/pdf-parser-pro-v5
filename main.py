@@ -2323,6 +2323,7 @@ async def create_checkout_session(request: CheckoutRequest, current_user = Depen
         "session_id": f"user_{current_user.customer_id}_{request.plan_type}_{int(time.time())}",
         "user_email": current_user.email,
         "requires_login": False
+    }
 
 @app.post("/customer-portal/")
 async def customer_portal(customer_id: str, return_url: str = "https://your-domain.com"):
