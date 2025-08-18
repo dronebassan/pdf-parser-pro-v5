@@ -625,7 +625,7 @@ def home():
                         </div>
                         <button onclick="quickLogin()" class="btn-primary" style="font-size: 0.875rem; padding: 0.5rem 1.5rem;">Login for Unlimited Processing</button>
                         <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.5rem;">
-                            Don't have an account? <a href="/pricing" style="color: var(--primary-color);">Get started for $4.99/month</a>
+                            Don't have an account? <a href="/pricing" style="color: var(--primary-color);">Get started for $6.99 CAD/month</a>
                         </p>
                     </div>
                 </div>
@@ -1244,6 +1244,7 @@ def pricing_page():
                         <span class="currency">$</span>26.99
                         <span class="period">/month CAD</span>
                     </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">Plus applicable taxes</div>
                     <div class="plan-description">Great for growing businesses</div>
                     <ul class="plan-features">
                         <li><i class="fas fa-check"></i> 2,500 pages/month</li>
@@ -1261,6 +1262,7 @@ def pricing_page():
                         <span class="currency">$</span>109.99
                         <span class="period">/month CAD</span>
                     </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">Plus applicable taxes</div>
                     <div class="plan-description">For established businesses with high volume</div>
                     <ul class="plan-features">
                         <li><i class="fas fa-check"></i> 10,000 pages/month</li>
@@ -1279,6 +1281,7 @@ def pricing_page():
                         <span class="currency">$</span>399.99
                         <span class="period">/month CAD</span>
                     </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">Plus applicable taxes</div>
                     <div class="plan-description">Maximum processing power and support</div>
                     <ul class="plan-features">
                         <li><i class="fas fa-check"></i> 50,000 pages/month</li>
