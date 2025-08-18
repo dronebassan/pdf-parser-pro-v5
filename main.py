@@ -882,6 +882,36 @@ def home():
                     loadingEl.classList.remove('active');
                     
                     if (result.success) {
+                        // Show success message first
+                        if (result.success_message) {
+                            const successDiv = document.createElement('div');
+                            successDiv.style.cssText = `
+                                background: #d4edda;
+                                color: #155724;
+                                border: 1px solid #c3e6cb;
+                                border-radius: 8px;
+                                padding: 16px 20px;
+                                margin: 20px 0;
+                                font-size: 16px;
+                                font-weight: 500;
+                                text-align: center;
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                            `;
+                            successDiv.textContent = result.success_message;
+                            
+                            // Insert success message before results
+                            const resultsContainer = document.querySelector('.results-container') || resultsEl.parentNode;
+                            resultsContainer.insertBefore(successDiv, resultsEl);
+                            
+                            // Auto-scroll to success message, then scroll down a bit more
+                            setTimeout(() => {
+                                successDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                setTimeout(() => {
+                                    window.scrollBy({ top: 200, behavior: 'smooth' });
+                                }, 1000);
+                            }, 100);
+                        }
+                        
                         // Show results with user info
                         let displayResult = {
                             success: result.success,
@@ -1960,6 +1990,7 @@ async def parse_pdf_advanced(
                 
                 return {
                     "success": True,
+                    "success_message": "✅ PDF successfully parsed! Scroll down to view your results.",
                     "text": result.text,
                     "tables": result.tables,
                     "images": result.images,
@@ -2023,6 +2054,7 @@ async def parse_pdf_advanced(
         
         return {
             "success": True,
+            "success_message": "✅ PDF successfully parsed! Scroll down to view your results.",
             "text": text.strip(),
             "tables": tables,
             "images": [],
