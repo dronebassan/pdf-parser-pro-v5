@@ -126,12 +126,25 @@ except Exception as e:
 # Initialize Authentication System
 auth_system = None
 try:
-    from auth_system import auth_system
-    print("✅ Authentication system initialized")
+    from auth_system import AuthSystem
+    auth_system = AuthSystem(secret_key="pdf-parser-jwt-secret-2024")
+    print("✅ Authentication system initialized successfully")
 except Exception as e:
     print(f"❌ Authentication system failed: {e}")
     print(f"Error details: {type(e).__name__}: {str(e)}")
-    auth_system = None
+    # Create a minimal fallback auth system
+    try:
+        class FallbackAuthSystem:
+            def __init__(self):
+                self.customers = {}
+                print("⚠️  Using fallback authentication system")
+            def create_customer(self, email, password, subscription_tier=None):
+                raise Exception("Authentication system unavailable - please try again later")
+            def authenticate_password(self, email, password):
+                return None
+        auth_system = FallbackAuthSystem()
+    except:
+        auth_system = None
 
 # Security
 security = HTTPBearer(auto_error=False)
@@ -2154,8 +2167,10 @@ async def register_page(plan: str = "student"):
 async def register_user(registration: UserRegistration):
     """Register a new user"""
     if not auth_system:
-        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+        print("❌ Registration failed: auth_system is None")
+        raise HTTPException(status_code=503, detail="Authentication service unavailable - server restarting")
     
+    print(f"🔄 Registration attempt for: {registration.email}")
     try:
         # Check if user already exists
         existing_customer = auth_system.get_customer_by_email(registration.email)
@@ -2448,8 +2463,10 @@ async def login_page(plan: str = "student"):
 async def login_user(login: UserLogin):
     """Verify user credentials and return user info"""
     if not auth_system:
-        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+        print("❌ Login failed: auth_system is None")
+        raise HTTPException(status_code=503, detail="Authentication service unavailable - server restarting")
     
+    print(f"🔄 Login attempt for: {login.email}")
     try:
         # Verify email and password
         customer = auth_system.authenticate_password(login.email, login.password)
