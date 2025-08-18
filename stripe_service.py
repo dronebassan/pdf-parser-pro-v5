@@ -48,7 +48,7 @@ class StripeService:
         self.plans = {
             PlanType.STUDENT: Plan(
                 name="Student Plan",
-                price_monthly=4.99,
+                price_monthly=6.99,
                 pages_included=500,
                 overage_rate=0.01,
                 features=[
@@ -57,12 +57,12 @@ class StripeService:
                     "All advanced features",
                     "Email support"
                 ],
-                stripe_price_id=os.getenv("STRIPE_STUDENT_PRICE_ID", ""),
+                stripe_price_id=os.getenv("STRIPE_STUDENT_PRICE_ID", "price_1RxLhYCVZzvkFjSrXR0pCSoO"),
                 stripe_usage_price_id=os.getenv("STRIPE_STUDENT_USAGE_PRICE_ID", "")
             ),
             PlanType.GROWTH: Plan(
                 name="Growth Plan",
-                price_monthly=19.99,
+                price_monthly=26.99,
                 pages_included=2500,
                 overage_rate=0.008,
                 features=[
@@ -72,12 +72,12 @@ class StripeService:
                     "Chat support",
                     "API access"
                 ],
-                stripe_price_id=os.getenv("STRIPE_GROWTH_PRICE_ID", ""),
+                stripe_price_id=os.getenv("STRIPE_GROWTH_PRICE_ID", "price_1RxLjPCVZzvkFjSr8Fm6xVAj"),
                 stripe_usage_price_id=os.getenv("STRIPE_GROWTH_USAGE_PRICE_ID", "")
             ),
             PlanType.BUSINESS: Plan(
                 name="Business Plan",
-                price_monthly=79.99,
+                price_monthly=109.99,
                 pages_included=10000,
                 overage_rate=0.008,
                 features=[
@@ -88,12 +88,12 @@ class StripeService:
                     "Full API access",
                     "Custom integrations"
                 ],
-                stripe_price_id=os.getenv("STRIPE_BUSINESS_PRICE_ID", ""),
+                stripe_price_id=os.getenv("STRIPE_BUSINESS_PRICE_ID", "price_1RxLk5CVZzvkFjSrSfrJfv0S"),
                 stripe_usage_price_id=os.getenv("STRIPE_BUSINESS_USAGE_PRICE_ID", "")
             ),
             PlanType.ENTERPRISE: Plan(
                 name="Enterprise Plan",
-                price_monthly=299.99,
+                price_monthly=399.99,
                 pages_included=50000,
                 overage_rate=0.006,
                 features=[
@@ -104,7 +104,7 @@ class StripeService:
                     "Custom deployment",
                     "SLA guarantees"
                 ],
-                stripe_price_id=os.getenv("STRIPE_ENTERPRISE_PRICE_ID", ""),
+                stripe_price_id=os.getenv("STRIPE_ENTERPRISE_PRICE_ID", "price_1RxLkqCVZzvkFjSra9ykMxJp"),
                 stripe_usage_price_id=os.getenv("STRIPE_ENTERPRISE_USAGE_PRICE_ID", "")
             )
         }

@@ -1224,9 +1224,10 @@ def pricing_page():
                 <div class="pricing-card">
                     <div class="plan-name">Student</div>
                     <div class="plan-price">
-                        <span class="currency">$</span>4.99
-                        <span class="period">/month</span>
+                        <span class="currency">$</span>6.99
+                        <span class="period">/month CAD</span>
                     </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">Plus applicable taxes</div>
                     <div class="plan-description">Perfect for students and light usage</div>
                     <ul class="plan-features">
                         <li><i class="fas fa-check"></i> 500 pages/month</li>
@@ -1240,8 +1241,8 @@ def pricing_page():
                 <div class="pricing-card popular">
                     <div class="plan-name">Growth</div>
                     <div class="plan-price">
-                        <span class="currency">$</span>19.99
-                        <span class="period">/month</span>
+                        <span class="currency">$</span>26.99
+                        <span class="period">/month CAD</span>
                     </div>
                     <div class="plan-description">Great for growing businesses</div>
                     <ul class="plan-features">
@@ -1257,8 +1258,8 @@ def pricing_page():
                 <div class="pricing-card">
                     <div class="plan-name">Business</div>
                     <div class="plan-price">
-                        <span class="currency">$</span>79.99
-                        <span class="period">/month</span>
+                        <span class="currency">$</span>109.99
+                        <span class="period">/month CAD</span>
                     </div>
                     <div class="plan-description">For established businesses with high volume</div>
                     <ul class="plan-features">
@@ -1275,8 +1276,8 @@ def pricing_page():
                 <div class="pricing-card">
                     <div class="plan-name">Enterprise</div>
                     <div class="plan-price">
-                        <span class="currency">$</span>299.99
-                        <span class="period">/month</span>
+                        <span class="currency">$</span>399.99
+                        <span class="period">/month CAD</span>
                     </div>
                     <div class="plan-description">Maximum processing power and support</div>
                     <ul class="plan-features">
