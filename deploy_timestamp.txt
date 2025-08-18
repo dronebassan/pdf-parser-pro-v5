@@ -1,3 +1,3 @@
-Deployment forced at: 2025-01-19 10:45:00
-Environment variables confirmed on Railway - forcing redeploy
-Stripe service should initialize properly now
+Deployment forced at: 2025-08-18 14:55:00
+Critical UX fixes deployed - registration & usage tracker added
+Fixed issue where users couldn't log back in after payment
