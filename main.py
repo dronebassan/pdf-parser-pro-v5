@@ -2125,9 +2125,26 @@ async def create_checkout_session(request: CheckoutRequest):
             stripe.api_key = api_key
             print("🔥 FORCED: Using Stripe key from Railway environment")
             
-            # Test connection
-            account = stripe.Account.retrieve()
-            print(f"✅ FORCED: Connected to Stripe account {account.id}")
+            # Test connection with detailed debugging
+            print(f"🔍 Testing Stripe API key: {api_key[:12]}...")
+            try:
+                account = stripe.Account.retrieve()
+                print(f"✅ FORCED: Connected to Stripe account {account.id}")
+                print(f"   Account type: {getattr(account, 'type', 'unknown')}")
+                print(f"   Country: {getattr(account, 'country', 'unknown')}")
+                print(f"   Business type: {getattr(account, 'business_type', 'unknown')}")
+                print(f"   Charges enabled: {getattr(account, 'charges_enabled', 'unknown')}")
+                print(f"   Details submitted: {getattr(account, 'details_submitted', 'unknown')}")
+            except stripe.error.AuthenticationError as e:
+                print(f"❌ Authentication failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Stripe API key invalid: {str(e)}")
+            except stripe.error.PermissionError as e:
+                print(f"❌ Permission denied: {e}")
+                raise HTTPException(status_code=500, detail=f"Stripe API key lacks permissions: {str(e)}")
+            except Exception as e:
+                print(f"❌ Account retrieval failed: {type(e).__name__}: {e}")
+                print(f"   Error attributes: {dir(e) if hasattr(e, '__dict__') else 'none'}")
+                raise HTTPException(status_code=500, detail=f"Stripe account error: {str(e)}")
             
             # Map plan types to prices
             plan_configs = {
