@@ -2120,26 +2120,59 @@ async def create_checkout_session(request: CheckoutRequest):
         print(f"🔥 Stripe service status: {stripe_service is not None}")
         
         if not stripe_service:
-            print("❌ Stripe service unavailable - using direct checkout links")
-            # Pre-configured Stripe Payment Links (replace with your actual links from Stripe Dashboard)
-            payment_links = {
-                "student": "https://buy.stripe.com/test_dR6aHo5W92HMdRS7ss",   # $4.99 CAD/month - Replace with your actual link
-                "growth": "https://buy.stripe.com/test_5kA5mU0Dp6Vo0dG5kk",   # $19.99 CAD/month - Replace with your actual link  
-                "business": "https://buy.stripe.com/test_6oE9CYcwxb5sb3O28b"  # $49.99 CAD/month - Replace with your actual link
-            }
+            print("❌ Stripe service unavailable - FORCING direct Stripe checkout with YOUR account")
             
-            # Get the pre-configured payment link for the requested plan
-            checkout_url = payment_links.get(request.plan_type.lower(), payment_links["student"])
-            
-            print(f"✅ Using pre-configured payment link for {request.plan_type}: {checkout_url}")
-            
-            return {
-                "success": True,
-                "checkout_url": checkout_url,
-                "session_id": f"payment_link_{request.plan_type}_{int(time.time())}",
-                "payment_link_mode": True,
-                "message": f"Redirecting to {request.plan_type} plan checkout page"
-            }
+            try:
+                import stripe
+                
+                # Get YOUR Stripe secret key
+                api_key = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_SECRET") or os.getenv("STRIPE_API_KEY")
+                
+                if not api_key:
+                    raise HTTPException(status_code=500, detail="Stripe API key not found")
+                
+                stripe.api_key = api_key
+                print(f"✅ Using YOUR Stripe key: {api_key[:15]}...")
+                
+                # Your pricing
+                prices = {
+                    "student": {"amount": 499, "name": "Student Plan"},    # $4.99 CAD
+                    "growth": {"amount": 1999, "name": "Growth Plan"},     # $19.99 CAD
+                    "business": {"amount": 4999, "name": "Business Plan"}  # $49.99 CAD
+                }
+                
+                plan = prices[request.plan_type.lower()]
+                
+                # Create checkout session for YOUR account
+                session = stripe.checkout.Session.create(
+                    payment_method_types=['card'],
+                    line_items=[{
+                        'price_data': {
+                            'currency': 'cad',
+                            'product_data': {'name': plan["name"]},
+                            'unit_amount': plan["amount"],
+                            'recurring': {'interval': 'month'}
+                        },
+                        'quantity': 1,
+                    }],
+                    mode='subscription',
+                    customer_email=request.customer_email,
+                    success_url=request.success_url + '?session_id={CHECKOUT_SESSION_ID}',
+                    cancel_url=request.cancel_url,
+                )
+                
+                print(f"✅ Created YOUR checkout session: {session.id}")
+                print(f"   Checkout URL: {session.url}")
+                
+                return {
+                    "success": True,
+                    "checkout_url": session.url,
+                    "session_id": session.id
+                }
+                
+            except Exception as e:
+                print(f"❌ Stripe checkout failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Checkout failed: {str(e)}")
     
         try:
             # Validate plan type
