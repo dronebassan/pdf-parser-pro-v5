@@ -16,7 +16,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="PDF Parser Pro API",
     description="AI-powered PDF processing with smart optimization",
-    version="2.0.0"
+    version="2.0.1-js-fixed"
 )
 
 # Mount static files
@@ -1789,7 +1789,7 @@ def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "version": "2.0.0",
+        "version": "2.0.1-js-fixed",
         "services": {
             "smart_parser": smart_parser is not None,
             "ocr_service": ocr_service is not None,
@@ -2021,7 +2021,7 @@ def api_info():
     """API information endpoint"""
     return {
         "name": "PDF Parser Pro",
-        "version": "2.0.0",
+        "version": "2.0.1-js-fixed",
         "description": "AI-powered PDF processing API",
         "features": {
             "basic_parsing": True,
