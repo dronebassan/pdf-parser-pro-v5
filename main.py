@@ -3544,6 +3544,42 @@ async def parse_pdf_advanced(
             # PAID USERS: Full AI features available
             print(f"💎 Paid user ({current_user.subscription_tier}): AI features enabled")
         
+        # 🚨 CHECK USAGE LIMITS BEFORE PROCESSING 🚨
+        print(f"🔍 USAGE CHECK: current_user = {current_user is not None}, user_id = {user_id}")
+        if current_user:
+            print(f"🔍 User details: {current_user.email}, tier: {current_user.subscription_tier}")
+            current_month = datetime.now().strftime("%Y-%m")
+            user_key = f"{user_id}_{current_month}"
+            current_usage = simple_usage_tracker.get(user_key, 0)
+            projected_usage = current_usage + pages_processed
+            
+            # Get user's limit
+            plan_limits = {
+                "free": 10,
+                "student": 500, 
+                "growth": 2500,
+                "business": 10000
+            }
+            user_limit = plan_limits.get(current_user.subscription_tier, 10)
+            
+            print(f"📊 LIMIT CHECK: User {user_id} ({current_user.subscription_tier}): {current_usage} + {pages_processed} = {projected_usage}/{user_limit}")
+            
+            # BLOCK if would exceed limit
+            if projected_usage > user_limit:
+                raise HTTPException(
+                    status_code=429,
+                    detail={
+                        "error": "Monthly limit exceeded",
+                        "message": f"This document would use {pages_processed} pages, but you only have {user_limit - current_usage} pages remaining this month.",
+                        "current_usage": current_usage,
+                        "limit": user_limit,
+                        "pages_needed": pages_processed,
+                        "upgrade_url": "/pricing"
+                    }
+                )
+        else:
+            print("⚠️  No current_user - processing as anonymous")
+
         # Use revolutionary smart parser if available
         if smart_parser:
             try:
@@ -3593,9 +3629,6 @@ async def parse_pdf_advanced(
                     if current_ai_usage >= max_ai_usage:
                         print(f"🛡️  AI limit reached for {subscription_tier} user ({current_ai_usage}/{max_ai_usage}). Forcing library-only parsing.")
                         parse_strategy = ParseStrategy.LIBRARY_ONLY
-                        
-                # 🚨 CHECK USAGE LIMITS BEFORE PROCESSING 🚨
-                if current_user:
                     current_month = datetime.now().strftime("%Y-%m")
                     user_key = f"{user_id}_{current_month}"
                     current_usage = simple_usage_tracker.get(user_key, 0)
