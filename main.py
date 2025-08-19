@@ -157,6 +157,11 @@ except Exception as e:
             api_key: str
             subscription_tier: str
             created_at: int
+            api_key_expires_at: int = 0
+            email_verified: bool = False
+            last_ip: str = ""
+            session_expires_at: int = 0
+            verification_code: str = ""
         
         class SimpleAuthSystem:
             def __init__(self, secret_key: str):
@@ -166,7 +171,7 @@ except Exception as e:
                 print("✅ Using simplified authentication system with persistent storage")
             
             def _load_customers(self):
-                """Load customers from JSON file"""
+                """Load customers from JSON file with migration support"""
                 try:
                     import json
                     import os
@@ -174,12 +179,49 @@ except Exception as e:
                         with open(self.db_file, 'r') as f:
                             data = json.load(f)
                             customers = {}
+                            migrated_count = 0
+                            
                             for email, customer_data in data.items():
+                                # MIGRATION LOGIC: Add missing fields for existing accounts
+                                original_data = customer_data.copy()
+                                
+                                # Add new security fields with sensible defaults
+                                if 'api_key_expires_at' not in customer_data:
+                                    # Existing paid users get 1 year, free users get 30 days
+                                    if customer_data.get('subscription_tier', 'free') != 'free':
+                                        customer_data['api_key_expires_at'] = int(time.time()) + (365 * 24 * 60 * 60)  # 1 year
+                                    else:
+                                        customer_data['api_key_expires_at'] = int(time.time()) + (30 * 24 * 60 * 60)   # 30 days
+                                    migrated_count += 1
+                                
+                                if 'email_verified' not in customer_data:
+                                    # Grandfather existing accounts as verified (they already paid/registered)
+                                    customer_data['email_verified'] = True
+                                    migrated_count += 1
+                                
+                                if 'last_ip' not in customer_data:
+                                    customer_data['last_ip'] = ""
+                                
+                                if 'session_expires_at' not in customer_data:
+                                    customer_data['session_expires_at'] = 0
+                                
+                                if 'verification_code' not in customer_data:
+                                    customer_data['verification_code'] = ""
+                                
+                                # Create customer object
                                 customers[email] = Customer(**customer_data)
+                            
+                            if migrated_count > 0:
+                                print(f"🔄 Migrated {migrated_count} existing user accounts to new security schema")
+                                # Save migrated data back to file
+                                self.customers = customers
+                                self._save_customers()
+                            
                             print(f"📂 Loaded {len(customers)} users from {self.db_file}")
                             return customers
                 except Exception as e:
                     print(f"⚠️  Could not load customers: {e}")
+                    print(f"Error details: {type(e).__name__}: {str(e)}")
                 return {}
             
             def _save_customers(self):
@@ -203,7 +245,12 @@ except Exception as e:
                     print(f"❌ Could not save customers: {e}")
             
             def generate_api_key(self) -> str:
+                """Generate API key with 30-day expiration"""
                 return f"pdf_parser_{secrets.token_urlsafe(32)}"
+            
+            def generate_verification_code(self) -> str:
+                """Generate 6-digit verification code"""
+                return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
             
             def hash_password(self, password: str) -> str:
                 return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -211,13 +258,19 @@ except Exception as e:
             def verify_password(self, password: str, hashed: str) -> bool:
                 return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
             
-            def create_customer(self, email: str, password: str, subscription_tier = SubscriptionTier.FREE):
+            def create_customer(self, email: str, password: str, subscription_tier = SubscriptionTier.FREE, ip_address: str = ""):
                 if self.get_customer_by_email(email):
                     raise Exception("Email already registered")
+                
+                # Check for too many accounts from same IP (prevent farming)
+                accounts_from_ip = sum(1 for c in self.customers.values() if c.last_ip == ip_address)
+                if accounts_from_ip >= 3 and subscription_tier == SubscriptionTier.FREE:
+                    raise Exception("Too many accounts created from this location. Please contact support.")
                 
                 customer_id = hashlib.md5(email.encode()).hexdigest()
                 api_key = self.generate_api_key()
                 password_hash = self.hash_password(password)
+                verification_code = self.generate_verification_code()
                 
                 customer = Customer(
                     customer_id=customer_id,
@@ -225,7 +278,12 @@ except Exception as e:
                     password_hash=password_hash,
                     api_key=api_key,
                     subscription_tier=subscription_tier,
-                    created_at=int(time.time())
+                    created_at=int(time.time()),
+                    api_key_expires_at=int(time.time()) + (30 * 24 * 60 * 60),  # 30 days
+                    email_verified=False,
+                    last_ip=ip_address,
+                    session_expires_at=0,
+                    verification_code=verification_code
                 )
                 
                 self.customers[email] = customer
@@ -241,20 +299,82 @@ except Exception as e:
             def get_customer_by_email(self, email: str) -> Optional[Customer]:
                 return self.customers.get(email)
             
-            def get_customer_by_api_key(self, api_key: str) -> Optional[Customer]:
+            def get_customer_by_api_key(self, api_key: str, ip_address: str = "") -> Optional[Customer]:
+                """Get customer by API key with security checks"""
                 for customer in self.customers.values():
                     if customer.api_key == api_key:
+                        # Check if API key expired
+                        if hasattr(customer, 'api_key_expires_at') and customer.api_key_expires_at > 0:
+                            if time.time() > customer.api_key_expires_at:
+                                print(f"🚫 API key expired for {customer.email}")
+                                return None
+                        
+                        # Check if email verified (required for paid features)
+                        if hasattr(customer, 'email_verified') and customer.subscription_tier != SubscriptionTier.FREE:
+                            if not customer.email_verified:
+                                print(f"🚫 Email not verified for paid user {customer.email}")
+                                return None
+                        
+                        # IP validation for high-value accounts
+                        if ip_address and hasattr(customer, 'last_ip') and customer.subscription_tier in [SubscriptionTier.GROWTH, SubscriptionTier.BUSINESS]:
+                            if customer.last_ip and customer.last_ip != ip_address:
+                                # Allow IP change but log it
+                                print(f"⚠️  IP change detected for {customer.email}: {customer.last_ip} -> {ip_address}")
+                                customer.last_ip = ip_address
+                                self._save_customers()
+                        
                         return customer
                 return None
             
             def upgrade_customer(self, email: str, new_tier: str) -> bool:
-                """Upgrade customer subscription tier"""
+                """Upgrade customer subscription tier with validation"""
                 customer = self.get_customer_by_email(email)
                 if customer:
-                    customer.subscription_tier = new_tier
-                    self._save_customers()  # Save to disk
-                    return True
+                    # Validate tier progression (prevent downgrade exploitation)
+                    tier_order = [SubscriptionTier.FREE, SubscriptionTier.STUDENT, SubscriptionTier.GROWTH, SubscriptionTier.BUSINESS]
+                    current_index = tier_order.index(customer.subscription_tier) if customer.subscription_tier in tier_order else 0
+                    new_index = tier_order.index(new_tier) if new_tier in tier_order else 0
+                    
+                    # Only allow upgrades or same tier (no downgrades without verification)
+                    if new_index >= current_index or customer.email_verified:
+                        customer.subscription_tier = new_tier
+                        # Reset API key expiration for paid upgrades
+                        if new_tier != SubscriptionTier.FREE:
+                            customer.api_key_expires_at = int(time.time()) + (365 * 24 * 60 * 60)  # 1 year for paid
+                        self._save_customers()  # Save to disk
+                        return True
+                    else:
+                        print(f"🚫 Tier downgrade blocked for unverified user: {email}")
+                        return False
                 return False
+            
+            def verify_email(self, email: str, verification_code: str) -> bool:
+                """Verify email with code"""
+                customer = self.get_customer_by_email(email)
+                if customer and hasattr(customer, 'verification_code'):
+                    if customer.verification_code == verification_code:
+                        customer.email_verified = True
+                        customer.verification_code = ""  # Clear code
+                        self._save_customers()
+                        print(f"✅ Email verified for {email}")
+                        return True
+                print(f"🚫 Invalid verification code for {email}")
+                return False
+            
+            def rotate_api_key(self, email: str) -> Optional[str]:
+                """Rotate API key for security"""
+                customer = self.get_customer_by_email(email)
+                if customer:
+                    old_key = customer.api_key
+                    customer.api_key = self.generate_api_key()
+                    if customer.subscription_tier == SubscriptionTier.FREE:
+                        customer.api_key_expires_at = int(time.time()) + (30 * 24 * 60 * 60)  # 30 days
+                    else:
+                        customer.api_key_expires_at = int(time.time()) + (365 * 24 * 60 * 60)  # 1 year
+                    self._save_customers()
+                    print(f"🔄 API key rotated for {email}")
+                    return customer.api_key
+                return None
         
         auth_system = SimpleAuthSystem(secret_key="pdf-parser-jwt-secret-2024")
     except Exception as fallback_error:
@@ -285,8 +405,8 @@ class UserLogin(BaseModel):
     password: str
 
 # Authentication dependency
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Get current authenticated user"""
+async def get_current_user(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current authenticated user with IP validation"""
     if not credentials or not auth_system:
         raise HTTPException(
             status_code=401,
@@ -294,10 +414,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         )
     
     try:
-        # Get customer by API key
-        customer = auth_system.get_customer_by_api_key(credentials.credentials)
+        # Get client IP for security validation
+        client_ip = request.client.host
+        
+        # Get customer by API key with IP validation
+        customer = auth_system.get_customer_by_api_key(credentials.credentials, client_ip)
         if not customer:
-            raise HTTPException(status_code=401, detail="Invalid API key")
+            raise HTTPException(status_code=401, detail="Invalid or expired API key")
         return customer
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
@@ -328,7 +451,8 @@ async def get_current_user_optional(request: Request, credentials: HTTPAuthoriza
     # Fallback to API key auth (for API usage)
     if credentials:
         try:
-            customer = auth_system.get_customer_by_api_key(credentials.credentials)
+            client_ip = request.client.host
+            customer = auth_system.get_customer_by_api_key(credentials.credentials, client_ip)
             return customer
         except:
             pass
@@ -401,10 +525,11 @@ def home():
                 max-width: 1200px;
                 margin: 0 auto;
                 padding: 0 2rem;
-                display: flex;
-                justify-content: space-between;
+                display: grid;
+                grid-template-columns: 1fr 2fr 1fr;
                 align-items: center;
                 min-height: 60px;
+                gap: 2rem;
             }
             
             .logo {
@@ -427,6 +552,7 @@ def home():
                 gap: 2.5rem;
                 list-style: none;
                 align-items: center;
+                justify-content: center;
             }
             
             .nav-links a {
@@ -897,16 +1023,19 @@ def home():
                     <li><a href="/docs">API Docs</a></li>
                 </ul>
                 
-                <!-- Usage Tracker - Only shown when logged in -->
-                <div id="usage-tracker" style="display: none; background: #667eea; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.875rem; font-weight: 500; margin-right: 1rem;">
-                    <i class="fas fa-chart-line"></i>
-                    <span id="usage-text">Loading...</span>
-                </div>
-                
-                <!-- Auth buttons -->
-                <div class="auth-section">
-                    <a href="/pricing" class="cta-button" id="get-started-btn">Get Started</a>
-                    <button onclick="logout()" class="btn-secondary" id="logout-btn" style="display: none; background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer; margin-left: 0.5rem;">Logout</button>
+                <!-- Auth and Usage Section -->
+                <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem;">
+                    <!-- Usage Tracker - Only shown when logged in -->
+                    <div id="usage-tracker" style="display: none; background: #667eea; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">
+                        <i class="fas fa-chart-line"></i>
+                        <span id="usage-text">Loading...</span>
+                    </div>
+                    
+                    <!-- Auth buttons -->
+                    <div class="auth-section" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <a href="/pricing" class="cta-button" id="get-started-btn">Get Started</a>
+                        <button onclick="logout()" class="btn-secondary" id="logout-btn" style="display: none; background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; cursor: pointer;">Logout</button>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -1597,10 +1726,11 @@ def pricing_page():
                 max-width: 1200px;
                 margin: 0 auto;
                 padding: 0 2rem;
-                display: flex;
-                justify-content: space-between;
+                display: grid;
+                grid-template-columns: 1fr 2fr 1fr;
                 align-items: center;
                 min-height: 60px;
+                gap: 2rem;
             }
             
             .logo {
@@ -1623,6 +1753,7 @@ def pricing_page():
                 gap: 2.5rem;
                 list-style: none;
                 align-items: center;
+                justify-content: center;
             }
             
             .nav-links a {
@@ -2322,8 +2453,8 @@ async def register_page(plan: str = "student"):
     return HTMLResponse(content=html_content)
 
 @app.post("/auth/register")
-async def register_user(registration: UserRegistration):
-    """Register a new user"""
+async def register_user(registration: UserRegistration, request: Request):
+    """Register a new user with email verification"""
     if not auth_system:
         print("❌ Registration failed: auth_system is None")
         raise HTTPException(status_code=503, detail="Authentication service unavailable - server restarting")
@@ -2335,8 +2466,8 @@ async def register_user(registration: UserRegistration):
         if existing_customer:
             return {
                 "success": False,
-                "error": "User already exists",
-                "api_key": existing_customer.api_key
+                "error": "User already exists. Please log in instead.",
+                "existing_user": True
             }
         
         # Map plan type to subscription tier
@@ -2347,12 +2478,14 @@ async def register_user(registration: UserRegistration):
         }
         
         subscription_tier = tier_map.get(registration.plan_type.lower(), "free")
+        client_ip = request.client.host
         
-        # Create customer with password
+        # Create customer with password and IP tracking
         customer = auth_system.create_customer(
             email=registration.email,
             password=registration.password,
-            subscription_tier=subscription_tier
+            subscription_tier=subscription_tier,
+            ip_address=client_ip
         )
         
         # Initialize usage tracking for the customer
@@ -2392,7 +2525,9 @@ async def register_user(registration: UserRegistration):
             "customer_id": customer.customer_id,
             "email": customer.email,
             "subscription_tier": customer.subscription_tier,
-            "message": "Account created successfully! You can now login with your email and password."
+            "verification_required": subscription_tier != "free",
+            "verification_code": customer.verification_code if hasattr(customer, 'verification_code') else None,
+            "message": "Account created successfully! Check your email for verification code." if subscription_tier != "free" else "Account created successfully! You can now login."
         }
         
         response = JSONResponse(content=response_data)
@@ -2783,10 +2918,39 @@ async def parse_pdf_advanced(
     import time as time_module
     current_time = time_module.time()
     
+    # IP-based anti-farming protection
+    client_ip = request.client.host
+    ip_key = f"ip_{client_ip}"
+    
+    # Check total uploads from this IP across all accounts
+    if ip_key not in user_upload_history:
+        user_upload_history[ip_key] = []
+    
+    # Clean old IP entries
+    user_upload_history[ip_key] = [
+        timestamp for timestamp in user_upload_history[ip_key]
+        if current_time - timestamp < 3600  # 1 hour
+    ]
+    
+    # Anti-farming: Max 50 uploads per hour per IP (prevents account creation spam)
+    if len(user_upload_history[ip_key]) >= 50:
+        raise HTTPException(
+            status_code=429, 
+            detail="Too many uploads from this location. This prevents abuse. Please try again later or contact support."
+        )
+    
     # Different limits for different user types
     if current_user:
         user_key = f"user_{current_user.customer_id}"
         subscription_tier = current_user.subscription_tier
+        
+        # Check if email verified for paid plans
+        if hasattr(current_user, 'email_verified') and subscription_tier != "free":
+            if not current_user.email_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Email verification required for paid features. Please check your email for verification code."
+                )
         
         # Tiered limits that encourage upgrades while staying profitable
         if subscription_tier == "student":
@@ -2799,7 +2963,7 @@ async def parse_pdf_advanced(
             max_uploads_per_hour = 15    # Free accounts with login - taste of premium
     else:
         # Anonymous users: strict limits to encourage signup
-        user_key = f"anon_{request.client.host}"
+        user_key = f"anon_{client_ip}"
         max_uploads_per_hour = 3     # Very limited - must create account
     
     # Clean old entries (older than 1 hour)
@@ -2823,8 +2987,9 @@ async def parse_pdf_advanced(
             
         raise HTTPException(status_code=429, detail=detail)
     
-    # Record this upload
+    # Record this upload for both user and IP tracking
     user_upload_history[user_key].append(current_time)
+    user_upload_history[ip_key].append(current_time)
     
     # Determine user info and limits
     user_id = None
@@ -3328,9 +3493,38 @@ async def user_dashboard(current_user = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/auth/verify-email")
+async def verify_email(email: str = Form(...), verification_code: str = Form(...)):
+    """Verify email address with code"""
+    if not auth_system:
+        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+    
+    success = auth_system.verify_email(email, verification_code)
+    if success:
+        return {"success": True, "message": "Email verified successfully! You now have access to paid features."}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+
+@app.post("/auth/rotate-api-key")
+async def rotate_api_key(current_user: Customer = Depends(get_current_user)):
+    """Rotate user's API key for security"""
+    if not auth_system:
+        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+    
+    new_api_key = auth_system.rotate_api_key(current_user.email)
+    if new_api_key:
+        return {
+            "success": True, 
+            "new_api_key": new_api_key,
+            "message": "API key rotated successfully. Please update your applications with the new key."
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to rotate API key")
+
 @app.get("/usage/{user_id}")
 async def get_user_usage(user_id: str):
     """Get user's current usage and limits (admin endpoint)"""
+    # You might want to add authentication here
     if not usage_tracker:
         raise HTTPException(status_code=503, detail="Usage tracking unavailable")
     
