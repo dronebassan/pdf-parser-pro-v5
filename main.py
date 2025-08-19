@@ -2785,13 +2785,22 @@ async def parse_pdf_advanced(
     
     # Different limits for different user types
     if current_user:
-        # Authenticated users: more generous limits
         user_key = f"user_{current_user.customer_id}"
-        max_uploads_per_hour = 20  # 20 uploads per hour for paid users
+        subscription_tier = current_user.subscription_tier
+        
+        # Tiered limits that encourage upgrades while staying profitable
+        if subscription_tier == "student":
+            max_uploads_per_hour = 40    # $4.99 plan - good for personal use
+        elif subscription_tier == "growth": 
+            max_uploads_per_hour = 120   # $19.99 plan - good for small business
+        elif subscription_tier == "business":
+            max_uploads_per_hour = 300   # $49.99 plan - enterprise level
+        else:
+            max_uploads_per_hour = 15    # Free accounts with login - taste of premium
     else:
-        # Anonymous users: strict limits
+        # Anonymous users: strict limits to encourage signup
         user_key = f"anon_{request.client.host}"
-        max_uploads_per_hour = 5   # 5 uploads per hour for free users
+        max_uploads_per_hour = 3     # Very limited - must create account
     
     # Clean old entries (older than 1 hour)
     if user_key in user_upload_history:
