@@ -1369,7 +1369,12 @@ def home():
                 if (file && file.type === 'application/pdf') {
                     uploadFile(file);
                 } else {
-                    alert('Please select a valid PDF file.');
+                    document.querySelector('.upload-area h3').textContent = 'Please select a valid PDF file';
+                    document.querySelector('.upload-area h3').style.color = '#ef4444';
+                    setTimeout(() => {
+                        document.querySelector('.upload-area h3').textContent = 'Upload Your PDF - FREE';
+                        document.querySelector('.upload-area h3').style.color = '';
+                    }, 3000);
                 }
             }
             
@@ -1597,12 +1602,22 @@ def home():
                         if (result.detail && typeof result.detail === 'object') {
                             showUpgradePrompt(result.detail);
                         } else {
-                            alert('Error: ' + (result.detail || result.error || 'Processing failed'));
+                            document.querySelector('.upload-area h3').textContent = 'Processing failed - please try again';
+                            document.querySelector('.upload-area h3').style.color = '#ef4444';
+                            setTimeout(() => {
+                                document.querySelector('.upload-area h3').textContent = 'Upload Your PDF - FREE';
+                                document.querySelector('.upload-area h3').style.color = '';
+                            }, 4000);
                         }
                     }
                 } catch (error) {
                     loadingEl.classList.remove('active');
-                    alert('Upload failed: ' + error.message);
+                    document.querySelector('.upload-area h3').textContent = 'Upload failed - check connection';
+                    document.querySelector('.upload-area h3').style.color = '#ef4444';
+                    setTimeout(() => {
+                        document.querySelector('.upload-area h3').textContent = 'Upload Your PDF - FREE';
+                        document.querySelector('.upload-area h3').style.color = '';
+                    }, 4000);
                 }
             }
             
@@ -1655,28 +1670,26 @@ def home():
                         submitBtn.innerHTML = '<span class="btn-text"><i class="fas fa-check"></i> Success!</span>';
                         submitBtn.style.background = '#16a34a';
                         
-                        showToast('Welcome Back!', 'You have been logged in successfully.', 'success');
-                        
-                        // Transition to logged in state
+                        // Transition to logged in state - no popup needed
                         setTimeout(() => {
                             showLoggedInState();
-                        }, 1000);
+                        }, 800);
                     } else {
                         submitBtn.classList.remove('btn-loading');
                         submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
                         
-                        if (result.message && result.message.includes('verification')) {
-                            showToast('Email Verification Required', 'Please check your email and complete verification before logging in.', 'warning');
-                        } else {
-                            showToast('Login Failed', result.message || 'Invalid email or password. Please double-check and try again.', 'error');
-                        }
-                        showLoginError(result.message || 'Invalid email or password');
+                        // Show error message inline (no popups)
+                        const errorMessage = result.message || 'Invalid email or password. Please check your credentials and try again.';
+                        showLoginError(errorMessage);
                     }
                 } catch (error) {
                     submitBtn.classList.remove('btn-loading');
                     submitBtn.disabled = false;
-                    showToast('Connection Error', 'Unable to connect. Please check your internet connection and try again.', 'error');
-                    showLoginError('Connection error. Please try again.');
+                    submitBtn.innerHTML = originalText;
+                    
+                    // Show error message inline (no popups)
+                    showLoginError('Connection error. Please check your internet connection and try again.');
                     console.error('Login error:', error);
                 } finally {
                     // Always reset button after delay if still loading or showing success
@@ -1741,7 +1754,7 @@ def home():
                 document.getElementById('get-started-btn').style.display = 'inline-block';
                 document.getElementById('logout-btn').style.display = 'none';
                 
-                showToast('Logged Out', 'You have been logged out successfully.', 'info');
+                // No popup - clean logout
             }
             
             // Show usage info
@@ -1754,13 +1767,12 @@ def home():
                     
                     if (result.success) {
                         const usage = result.usage_info;
-                        alert(`Usage This Month:
-Pages Used: ${usage.total_pages || 0}
-Plan: ${result.subscription_tier}
-Total Cost: $${usage.total_cost || 0}`);
+                        // Show usage inline instead of popup
+                        const usageText = `${usage.total_pages || 0} pages used this month (${result.subscription_tier} plan)`;
+                        document.getElementById('usage-text').textContent = usageText;
                     }
                 } catch (error) {
-                    alert('Could not fetch usage info');
+                    console.log('Could not fetch usage info');
                 }
             }
             
@@ -1819,14 +1831,14 @@ Total Cost: $${usage.total_cost || 0}`);
                 }
             }
             
-            // Debug function to check Stripe status
+            // Debug function to check Stripe status (console only)
             async function debugStripeStatus() {
                 try {
                     const response = await fetch('/stripe-status/');
                     const data = await response.json();
-                    alert('🔍 Stripe Debug Info:\\n\\n' + JSON.stringify(data, null, 2));
+                    console.log('🔍 Stripe Debug Info:', data);
                 } catch (error) {
-                    alert('❌ Debug Error: ' + error.message);
+                    console.error('❌ Debug Error:', error);
                 }
             }
             
@@ -1871,7 +1883,12 @@ Total Cost: $${usage.total_cost || 0}`);
                     if (file.type === 'application/pdf') {
                         uploadFile(file);
                     } else {
-                        alert('Please drop a valid PDF file.');
+                        document.querySelector('.upload-area h3').textContent = 'Please drop a valid PDF file';
+                        document.querySelector('.upload-area h3').style.color = '#ef4444';
+                        setTimeout(() => {
+                            document.querySelector('.upload-area h3').textContent = 'Upload Your PDF - FREE';
+                            document.querySelector('.upload-area h3').style.color = '';
+                        }, 3000);
                     }
                 }
             }
@@ -2438,23 +2455,7 @@ def pricing_page():
             // Test function first - simpler implementation
             function testButton(planType) {
                 console.log('🔥 TEST: Button clicked for plan:', planType);
-                alert('✅ SUCCESS! Button is working for plan: ' + planType);
-                
-                // Test fetch to ensure network connectivity
-                fetch('/test-button/', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({plan: planType, test: true, timestamp: new Date().toISOString()})
-                })
-                .then(function(response) { return response.json(); })
-                .then(function(result) {
-                    console.log('🔥 TEST: Server response:', result);
-                    alert('✅ Server Response: ' + JSON.stringify(result, null, 2));
-                })
-                .catch(function(error) {
-                    console.error('🔥 TEST: Error:', error);
-                    alert('❌ Network Error: ' + error.message);
-                });
+                // Test removed - no popups in production
             }
             
             // Stripe Checkout Integration - Fixed version
@@ -2484,7 +2485,11 @@ def pricing_page():
                     
                 } catch (error) {
                     console.error('❌ CHECKOUT ERROR:', error);
-                    alert('Error: ' + error.message);
+                    if (button) {
+                        button.innerHTML = 'Service Unavailable';
+                        button.style.background = '#ef4444';
+                        button.disabled = true;
+                    }
                 }
             }
             
@@ -4213,14 +4218,16 @@ async def user_dashboard(current_user = Depends(get_current_user)):
                         if (data.success && data.portal_url) {{
                             window.location.href = data.portal_url;
                         }} else {{
-                            alert('Error: ' + (data.error || 'Could not open billing portal'));
+                            console.error('Billing portal error:', data.error);
+                            event.target.innerHTML = '💳 Service Unavailable';
+                            event.target.style.background = '#ef4444';
                             event.target.innerHTML = '💳 Manage Subscription';
                             event.target.disabled = false;
                         }}
                     }})
                     .catch(error => {{
                         console.error('Error:', error);
-                        alert('Error opening billing portal');
+                        console.error('Error opening billing portal:', error);
                         event.target.innerHTML = '💳 Manage Subscription';
                         event.target.disabled = false;
                     }});
