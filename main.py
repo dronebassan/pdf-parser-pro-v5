@@ -3269,13 +3269,16 @@ async def get_current_user_info(request: Request, current_user = Depends(get_cur
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    # Get usage info
-    usage_info = {"total_pages": 0, "total_cost": 0}
-    if usage_tracker:
-        try:
-            usage_info = usage_tracker.get_monthly_usage(current_user.customer_id)
-        except:
-            pass
+    # Get usage info from the SAME simple tracker used for processing
+    current_month = datetime.now().strftime("%Y-%m")
+    user_key = f"{current_user.customer_id}_{current_month}"
+    total_pages_used = simple_usage_tracker.get(user_key, 0)
+    
+    usage_info = {
+        "total_pages": total_pages_used,
+        "total_cost": total_pages_used * 0.02,  # Simple cost calculation
+        "billing_period": current_month
+    }
     
     return {
         "success": True,
