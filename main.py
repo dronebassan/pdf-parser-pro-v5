@@ -1276,6 +1276,7 @@ def home():
                         <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Welcome back!</h4>
                         <p style="color: var(--text-secondary); font-size: 0.875rem;">You're logged in with unlimited processing</p>
                         <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
+                            <a href="/dashboard" class="btn-secondary" style="font-size: 0.875rem; padding: 0.5rem 1rem; text-decoration: none; display: inline-block;">📊 Dashboard</a>
                             <button onclick="showUsage()" class="btn-secondary" style="font-size: 0.875rem; padding: 0.5rem 1rem;">View Usage</button>
                             <button onclick="logout()" class="btn-secondary" style="font-size: 0.875rem; padding: 0.5rem 1rem;">Logout</button>
                         </div>
@@ -1639,9 +1640,15 @@ def home():
                     const result = await response.json();
                     
                     if (result.success) {
-                        // Store user session
+                        // Store user session info
                         localStorage.setItem('pdf_parser_email', email);
                         localStorage.setItem('pdf_parser_logged_in', 'true');
+                        if (result.api_key) {
+                            localStorage.setItem('pdf_parser_api_key', result.api_key);
+                        }
+                        if (result.subscription_tier) {
+                            localStorage.setItem('pdf_parser_subscription_tier', result.subscription_tier);
+                        }
                         
                         // Show success
                         submitBtn.classList.remove('btn-loading');
@@ -1717,8 +1724,14 @@ def home():
             
             // Logout
             function logout() {
+                // Clear all stored session data
                 localStorage.removeItem('pdf_parser_api_key');
                 localStorage.removeItem('pdf_parser_email');
+                localStorage.removeItem('pdf_parser_logged_in');
+                localStorage.removeItem('pdf_parser_subscription_tier');
+                localStorage.removeItem('pdf_parser_customer_id');
+                
+                // Update UI to logged out state
                 document.getElementById('login-section').style.display = 'block';
                 document.getElementById('account-section').style.display = 'none';
                 
@@ -1727,7 +1740,7 @@ def home():
                 document.getElementById('get-started-btn').style.display = 'inline-block';
                 document.getElementById('logout-btn').style.display = 'none';
                 
-                alert('Logged out successfully');
+                showToast('Logged Out', 'You have been logged out successfully.', 'info');
             }
             
             // Show usage info
