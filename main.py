@@ -2236,6 +2236,23 @@ def pricing_page():
             <!-- Pricing Grid -->
             <section class="pricing-grid">
                 <div class="pricing-card">
+                    <div class="plan-name">Free</div>
+                    <div class="plan-price">
+                        <span class="currency">$</span>0
+                        <span class="period">/forever</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">No credit card required</div>
+                    <div class="plan-description">Try our basic PDF processing</div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 10 pages per document</li>
+                        <li><i class="fas fa-check"></i> Library-based parsing</li>
+                        <li><i class="fas fa-check"></i> OCR for scanned PDFs</li>
+                        <li><i class="fas fa-times" style="color: var(--text-muted);"></i> <span style="color: var(--text-muted);">AI processing (upgrade required)</span></li>
+                    </ul>
+                    <a href="/" class="plan-button secondary">Try Free Now</a>
+                </div>
+                
+                <div class="pricing-card">
                     <div class="plan-name">Student</div>
                     <div class="plan-price">
                         <span class="currency">$</span>4.99
@@ -2245,7 +2262,8 @@ def pricing_page():
                     <div class="plan-description">Perfect for students and light usage</div>
                     <ul class="plan-features">
                         <li><i class="fas fa-check"></i> 500 pages/month</li>
-                        <li><i class="fas fa-check"></i> AI-powered processing</li>
+                        <li><i class="fas fa-check"></i> 🤖 AI-powered processing</li>
+                        <li><i class="fas fa-check"></i> 25 AI documents/month</li>
                         <li><i class="fas fa-check"></i> All advanced features</li>
                         <li><i class="fas fa-check"></i> Email support</li>
                     </ul>
@@ -2262,6 +2280,8 @@ def pricing_page():
                     <div class="plan-description">Great for growing businesses</div>
                     <ul class="plan-features">
                         <li><i class="fas fa-check"></i> 2,500 pages/month</li>
+                        <li><i class="fas fa-check"></i> 🤖 AI-powered processing</li>
+                        <li><i class="fas fa-check"></i> 100 AI documents/month</li>
                         <li><i class="fas fa-check"></i> Priority processing</li>
                         <li><i class="fas fa-check"></i> Advanced analytics</li>
                         <li><i class="fas fa-check"></i> Chat support</li>
@@ -2298,7 +2318,7 @@ def pricing_page():
                 <div class="faq-grid">
                     <div class="faq-item">
                         <div class="faq-question">How does the 3-step fallback system work?</div>
-                        <div class="faq-answer">We start with fast library-based processing. If that doesn't meet quality standards, we fall back to AI processing. As a final step, we use advanced OCR for the most challenging documents.</div>
+                        <div class="faq-answer">Free users get library-based processing and OCR. Paid users get our revolutionary AI-powered processing that handles complex layouts, tables, and challenging documents with superior accuracy.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question">What happens if I exceed my monthly page limit?</div>
@@ -3299,7 +3319,7 @@ async def parse_pdf_advanced(
                     status_code=401,
                     detail={
                         "error": "Free tier limited to 10 pages per document",
-                        "message": "Loved the results? Get 500 more pages for just $4.99/month!",
+                        "message": "Want more pages + AI processing? Upgrade to Student plan for just $4.99/month!",
                         "upgrade_url": "/pricing",
                         "register_url": "/auth/register",
                         "pages_processed": pages_processed,
@@ -3313,6 +3333,15 @@ async def parse_pdf_advanced(
         
         # Run memory cleanup to prevent memory attacks
         cleanup_memory_usage()
+        
+        # PAID-ONLY AI STRATEGY: Protect costs by restricting AI to paying customers
+        if not current_user or current_user.subscription_tier == "free":
+            # FREE USERS: Library-only parsing (no AI costs)
+            strategy = "library_only"
+            print(f"🆓 Free tier: Using library-only parsing (no AI costs)")
+        else:
+            # PAID USERS: Full AI features available
+            print(f"💎 Paid user ({current_user.subscription_tier}): AI features enabled")
         
         # Use revolutionary smart parser if available
         if smart_parser:
@@ -3330,11 +3359,10 @@ async def parse_pdf_advanced(
                     "hybrid": ParseStrategy.HYBRID
                 }
                 
-                parse_strategy = strategy_map.get(strategy, ParseStrategy.AUTO)
+                parse_strategy = strategy_map.get(strategy, ParseStrategy.LIBRARY_ONLY)  # Default to safe option
                 
-                # 3. AI COST PROTECTION - Prevent expensive AI abuse
-                if current_user:
-                    user_ai_key = f"ai_{current_user.customer_id}"
+                # 3. AI COST PROTECTION - PAID USERS ONLY
+                if current_user and current_user.subscription_tier != "free":
                     subscription_tier = current_user.subscription_tier
                     
                     # Clean old AI usage (reset monthly)
