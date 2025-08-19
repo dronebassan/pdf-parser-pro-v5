@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta
 from auth_system import Customer
 
+# Only keep the essential fixes that don't break registration
+
 # Initialize FastAPI
 app = FastAPI(
     title="PDF Parser Pro API",
@@ -158,27 +160,6 @@ except Exception as e:
             STUDENT = "student"
             GROWTH = "growth"
             BUSINESS = "business"
-            
-            @classmethod
-            def is_valid(cls, tier):
-                """Check if a tier is valid"""
-                valid_tiers = [cls.FREE, cls.STUDENT, cls.GROWTH, cls.BUSINESS]
-                return tier in valid_tiers
-            
-            @classmethod
-            def normalize(cls, tier):
-                """Normalize tier to standard format"""
-                if isinstance(tier, str):
-                    tier = tier.lower().strip()
-                    if tier in ["free", "f"]:
-                        return cls.FREE
-                    elif tier in ["student", "s"]:
-                        return cls.STUDENT
-                    elif tier in ["growth", "g"]:
-                        return cls.GROWTH
-                    elif tier in ["business", "b", "enterprise", "e"]:
-                        return cls.BUSINESS
-                return cls.FREE  # Safe default
         
         @dataclass
         class Customer:
@@ -2918,35 +2899,22 @@ async def register_user(registration: UserRegistration, request: Request):
                 "existing_user": True
             }
         
-        # Normalize subscription tier
-        subscription_tier = SubscriptionTier.normalize(registration.plan_type)
+        # Map plan type to subscription tier
+        tier_map = {
+            "student": "student",
+            "growth": "growth", 
+            "business": "business"
+        }
+        
+        subscription_tier = tier_map.get(registration.plan_type.lower(), "free")
         client_ip = request.client.host
         
-        # Import the actual SubscriptionTier for auth_system
-        try:
-            from api_key_manager import SubscriptionTier as AuthSubscriptionTier
-            # Map string to enum for auth_system
-            auth_tier_map = {
-                "free": AuthSubscriptionTier.FREE,
-                "student": AuthSubscriptionTier.STUDENT,
-                "growth": AuthSubscriptionTier.GROWTH,
-                "business": AuthSubscriptionTier.BUSINESS
-            }
-            auth_subscription_tier = auth_tier_map.get(subscription_tier, AuthSubscriptionTier.FREE)
-            
-            # Create customer with proper API
-            customer = auth_system.create_customer(
-                email=registration.email,
-                password=registration.password,
-                subscription_tier=auth_subscription_tier
-            )
-        except ImportError:
-            # Fallback if api_key_manager not available
-            customer = auth_system.create_customer(
-                email=registration.email,
-                password=registration.password,
-                subscription_tier=subscription_tier
-            )
+        # Create customer with proper API (remove ip_address - that was the only needed fix)
+        customer = auth_system.create_customer(
+            email=registration.email,
+            password=registration.password,
+            subscription_tier=subscription_tier
+        )
         
         # Initialize usage tracking for the customer
         if usage_tracker:
@@ -4076,7 +4044,12 @@ async def stripe_webhook(request: Request):
                 # Upgrade account and setup billing cycle
                 if auth_system and hasattr(auth_system, 'upgrade_customer'):
                     try:
-                        new_tier = SubscriptionTier.normalize(plan)
+                        tier_map = {
+                            "student": "student",
+                            "growth": "growth", 
+                            "business": "business"
+                        }
+                        new_tier = tier_map.get(plan.lower(), "student")
                         
                         if auth_system.upgrade_customer(customer_email, new_tier):
                             print(f"🎯 Successfully upgraded {customer_email} to {new_tier} tier")

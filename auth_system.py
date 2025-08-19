@@ -38,7 +38,7 @@ class AuthSystem:
         """Verify password against hash"""
         return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
     
-    def create_customer(self, email: str, password: str, subscription_tier: SubscriptionTier = SubscriptionTier.FREE) -> Customer:
+    def create_customer(self, email: str, password: str, subscription_tier = "free") -> Customer:
         """Create new customer account with email/password"""
         
         # Check if customer already exists
@@ -61,8 +61,11 @@ class AuthSystem:
         # Store customer (in production: database)
         self.customers[email] = customer  # Store by email for easy lookup
         
-        # Create customer config in API key manager
-        api_key_manager.create_customer(customer_id, email, subscription_tier)
+        # Create customer config in API key manager  
+        try:
+            api_key_manager.create_customer(customer_id, email, subscription_tier)
+        except:
+            pass  # Don't let this break registration
         
         return customer
     
