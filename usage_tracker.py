@@ -556,6 +556,86 @@ class UsageTracker:
         except Exception as e:
             print(f"❌ Subscription linking failed: {e}")
             return {"success": False, "error": str(e)}
+    
+    def get_monthly_ai_usage(self, user_id: str, month: str) -> Dict[str, Any]:
+        """Get AI usage for specific month from database (secure)"""
+        try:
+            with self.get_db_connection() as conn:
+                # Create monthly_ai_usage table if it doesn't exist
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS monthly_ai_usage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        month TEXT NOT NULL,
+                        count INTEGER DEFAULT 0,
+                        last_updated TEXT NOT NULL,
+                        UNIQUE(user_id, month)
+                    )
+                ''')
+                
+                # Get current count
+                cursor = conn.execute('''
+                    SELECT count FROM monthly_ai_usage 
+                    WHERE user_id = ? AND month = ?
+                ''', (user_id, month))
+                
+                result = cursor.fetchone()
+                count = result[0] if result else 0
+                
+                return {"count": count, "month": month, "user_id": user_id}
+                
+        except Exception as e:
+            print(f"❌ AI usage retrieval failed: {e}")
+            return {"count": 0, "month": month, "user_id": user_id}
+    
+    def increment_monthly_ai_usage(self, user_id: str, month: str) -> Dict[str, Any]:
+        """Increment AI usage count for month (database-based, secure)"""
+        try:
+            timestamp = datetime.now()
+            
+            with self.get_db_connection() as conn:
+                # Create table if needed
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS monthly_ai_usage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        month TEXT NOT NULL,
+                        count INTEGER DEFAULT 0,
+                        last_updated TEXT NOT NULL,
+                        UNIQUE(user_id, month)
+                    )
+                ''')
+                
+                # Increment or insert
+                conn.execute('''
+                    INSERT INTO monthly_ai_usage (user_id, month, count, last_updated)
+                    VALUES (?, ?, 1, ?)
+                    ON CONFLICT(user_id, month) 
+                    DO UPDATE SET 
+                        count = count + 1,
+                        last_updated = ?
+                ''', (user_id, month, timestamp.isoformat(), timestamp.isoformat()))
+                
+                conn.commit()
+                
+                # Get new count
+                cursor = conn.execute('''
+                    SELECT count FROM monthly_ai_usage 
+                    WHERE user_id = ? AND month = ?
+                ''', (user_id, month))
+                
+                result = cursor.fetchone()
+                new_count = result[0] if result else 1
+                
+                return {
+                    "success": True,
+                    "new_count": new_count,
+                    "month": month
+                }
+                
+        except Exception as e:
+            print(f"❌ AI usage increment failed: {e}")
+            return {"success": False, "error": str(e)}
 
 # Global instance
 usage_tracker = UsageTracker()

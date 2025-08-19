@@ -3311,6 +3311,9 @@ async def parse_pdf_advanced(
         
         result = None
         
+        # Run memory cleanup to prevent memory attacks
+        cleanup_memory_usage()
+        
         # Use revolutionary smart parser if available
         if smart_parser:
             try:
