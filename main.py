@@ -3525,7 +3525,7 @@ async def parse_pdf_advanced(
         result = None
         
         # Run memory cleanup to prevent memory attacks
-        cleanup_memory_usage()
+        cleanup_memory()
         
         # PAID-ONLY AI STRATEGY: Protect costs by restricting AI to paying customers
         if not current_user or current_user.subscription_tier == "free":
@@ -3557,6 +3557,7 @@ async def parse_pdf_advanced(
                 # 3. AI COST PROTECTION - PAID USERS ONLY
                 if current_user and current_user.subscription_tier != "free":
                     subscription_tier = current_user.subscription_tier
+                    user_ai_key = f"ai_{current_user.customer_id}"
                     
                     # Clean old AI usage (reset monthly)
                     import datetime
@@ -3589,7 +3590,6 @@ async def parse_pdf_advanced(
                 
                 # Track AI usage for cost protection and billing
                 if ai_used and current_user:
-                    user_ai_key = f"ai_{current_user.customer_id}"
                     if user_ai_key in monthly_ai_usage:
                         monthly_ai_usage[user_ai_key]["count"] += 1
                         print(f"💰 AI usage tracked: {monthly_ai_usage[user_ai_key]['count']} for {current_user.subscription_tier} user")
