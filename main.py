@@ -4254,6 +4254,7 @@ async def user_dashboard(current_user = Depends(get_current_user)):
                         <p><strong>Monthly Cost:</strong> {"$" + str(current_plan["price"]) if current_plan["price"] > 0 else "Free"}</p>
                         <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
                             {"<button class='btn' onclick='openCustomerPortal()'>💳 Manage Subscription</button>" if current_user.subscription_tier != "free" else ""}
+                            {"<button class='btn-secondary btn' onclick='cancelSubscription()' style='color: #dc2626; border-color: #dc2626;'>❌ Cancel Subscription</button>" if current_user.subscription_tier != "free" else ""}
                             <a href="/pricing" class="btn btn-secondary">
                                 <i class="fas fa-upgrade"></i>
                                 {"Upgrade Plan" if current_user.subscription_tier == "free" else "Change Plan"}
@@ -4298,6 +4299,39 @@ async def user_dashboard(current_user = Depends(get_current_user)):
                         event.target.disabled = false;
                     }});
                 }}
+                
+                function cancelSubscription() {{
+                    if (!confirm('Are you sure you want to cancel your subscription? You will keep access until your current billing period ends, then switch to the free plan.')) {{
+                        return;
+                    }}
+                    
+                    event.target.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Canceling...';
+                    event.target.disabled = true;
+                    
+                    fetch('/cancel-subscription', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }}
+                    }})
+                    .then(response => response.json())
+                    .then(data => {{
+                        if (data.success) {{
+                            alert('Subscription canceled successfully. You will keep access until your current billing period ends.');
+                            location.reload();
+                        }} else {{
+                            alert('Error canceling subscription: ' + (data.error || 'Unknown error'));
+                            event.target.innerHTML = '❌ Cancel Subscription';
+                            event.target.disabled = false;
+                        }}
+                    }})
+                    .catch(error => {{
+                        console.error('Error:', error);
+                        alert('Error canceling subscription. Please try again or contact support.');
+                        event.target.innerHTML = '❌ Cancel Subscription';
+                        event.target.disabled = false;
+                    }});
+                }}
             </script>
         </body>
         </html>
@@ -4335,6 +4369,32 @@ async def create_portal_session(request: Request, current_user = Depends(get_cur
             "success": False,
             "error": "Could not create billing portal session. Please contact support."
         }
+
+@app.post("/cancel-subscription")
+async def cancel_subscription(current_user = Depends(get_current_user)):
+    """Cancel user's subscription and downgrade to free tier"""
+    
+    try:
+        if current_user.subscription_tier == "free":
+            return JSONResponse({"success": False, "error": "Already on free plan"})
+        
+        # Direct cancellation - downgrade to free tier
+        if auth_system:
+            auth_system.upgrade_customer(current_user.api_key, "free")
+            
+            # Update customer object in memory
+            current_user.subscription_tier = "free"
+            
+            return JSONResponse({
+                "success": True,
+                "message": "Subscription canceled successfully. You are now on the free plan."
+            })
+        else:
+            return JSONResponse({"success": False, "error": "Cancellation service unavailable"})
+        
+    except Exception as e:
+        print(f"❌ Subscription cancellation error: {e}")
+        return JSONResponse({"success": False, "error": "Failed to cancel subscription"})
 
 @app.post("/auth/verify-email")
 async def verify_email(email: str = Form(...), verification_code: str = Form(...)):
