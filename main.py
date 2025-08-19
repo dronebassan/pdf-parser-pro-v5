@@ -7,7 +7,7 @@ import fitz  # PyMuPDF
 from tempfile import NamedTemporaryFile
 import os
 import time
-# import stripe  # DISABLED - causes AttributeError crash during Railway deployment
+import stripe  # Re-enabled for production billing
 from typing import Optional, Dict, Any
 import json
 from pydantic import BaseModel
@@ -3254,15 +3254,44 @@ async def parse_pdf_advanced(
             print(f"⚠️  Page calculation failed: {e}")
             pages_processed = 1  # Safe fallback
         
-        # Check usage limits and permissions
+        # Check usage limits and permissions with overage billing
         if current_user and usage_tracker:
-            # Authenticated user - check their limits
+            # Authenticated user - check their limits and handle overages
             usage_check = usage_tracker.check_user_limits(user_id, pages_processed)
+            
+            # If over limit, calculate overage charges
             if not usage_check.get("success", True):
-                raise HTTPException(
-                    status_code=429, 
-                    detail=f"Usage limit exceeded. {usage_check.get('error', 'Please upgrade your plan or wait for next billing cycle.')}"
-                )
+                overage_pages = usage_check.get("overage_pages", 0)
+                overage_cost = usage_check.get("overage_cost", 0)
+                
+                if overage_pages > 0 and current_user.subscription_tier != "free":
+                    # Process overage billing for paid users
+                    try:
+                        if stripe_service:
+                            # Create overage invoice
+                            print(f"💰 Creating overage invoice: ${overage_cost:.2f} for {overage_pages} pages")
+                            
+                            # Record overage for future billing
+                            usage_tracker.record_overage_usage(
+                                user_id=user_id,
+                                overage_pages=overage_pages,
+                                overage_cost=overage_cost
+                            )
+                            
+                            # Allow processing to continue
+                            print(f"✅ Overage approved: Processing {pages_processed} pages")
+                        else:
+                            print(f"⚠️  Stripe not available for overage billing")
+                            # Still allow processing for paid users
+                    except Exception as e:
+                        print(f"⚠️  Overage billing failed: {e}")
+                        # Still allow processing for paid users
+                else:
+                    # Free users hit hard limit
+                    raise HTTPException(
+                        status_code=429,
+                        detail=f"Monthly limit exceeded. Upgrade to continue processing or wait for next billing cycle."
+                    )
         elif not current_user:
             # Unauthenticated user - free tier with generous limits to drive conversions
             if pages_processed > 10:  # Free tier: max 10 pages per request
@@ -3334,16 +3363,34 @@ async def parse_pdf_advanced(
                 # Check if AI was used
                 ai_used = result.fallback_triggered or "ai" in result.method_used.lower() or "llm" in result.method_used.lower()
                 
-                # Track AI usage for cost protection
+                # Track AI usage for cost protection and billing
                 if ai_used and current_user:
                     user_ai_key = f"ai_{current_user.customer_id}"
                     if user_ai_key in monthly_ai_usage:
                         monthly_ai_usage[user_ai_key]["count"] += 1
                         print(f"💰 AI usage tracked: {monthly_ai_usage[user_ai_key]['count']} for {current_user.subscription_tier} user")
+                    
+                    # Record AI cost for billing
+                    if usage_tracker:
+                        try:
+                            usage_tracker.record_ai_usage(
+                                user_id=current_user.customer_id,
+                                ai_cost=0.02  # $0.02 per AI processing call
+                            )
+                        except Exception as e:
+                            print(f"💰 AI cost tracking failed: {e}")
                 
-                # Track usage for billing
+                # Track usage and update billing cycle
                 if user_id and usage_tracker:
                     try:
+                        # Check and reset billing cycle if needed
+                        usage_tracker.check_and_reset_billing_cycle(user_id)
+                        
+                        # Record usage with accurate cost estimation
+                        base_cost = pages_processed * 0.001  # Base processing cost
+                        ai_cost = 0.02 if ai_used else 0  # AI processing cost
+                        total_cost = base_cost + ai_cost
+                        
                         usage_tracker.track_usage(
                             user_id=user_id,
                             subscription_id="",  # Would get from user's subscription
@@ -3351,8 +3398,10 @@ async def parse_pdf_advanced(
                             document_name=file.filename,
                             processing_strategy=result.method_used,
                             ai_used=ai_used,
-                            cost_estimate=pages_processed * (0.001 if ai_used else 0.0001)
+                            cost_estimate=total_cost
                         )
+                        
+                        print(f"📊 Usage tracked: {pages_processed} pages, cost: ${total_cost:.4f}")
                     except Exception as e:
                         print(f"Usage tracking failed: {e}")
                 elif not current_user:
@@ -3600,21 +3649,24 @@ async def customer_portal(customer_id: str, return_url: str = "https://your-doma
 
 @app.post("/stripe-webhook/")
 async def stripe_webhook(request: Request):
-    """Handle Stripe webhooks - SIMPLIFIED to prevent crashes"""
+    """Handle Stripe webhooks with full billing automation"""
     import json
+    from datetime import datetime, timedelta
     
     try:
         payload = await request.body()
         event = json.loads(payload)
-        print(f"📨 Webhook received: {event.get('type', 'unknown')}")
+        event_type = event.get('type', 'unknown')
+        print(f"📨 Webhook received: {event_type}")
         
-        # Handle payment completion - upgrade matching email accounts
-        if event['type'] == 'checkout.session.completed':
+        # Handle initial payment completion
+        if event_type == 'checkout.session.completed':
             session = event['data']['object']
             customer_email = session.get('customer_details', {}).get('email')
+            subscription_id = session.get('subscription')
             
             if customer_email:
-                print(f"💳 Payment completed for: {customer_email}")
+                print(f"💳 Initial payment completed for: {customer_email}")
                 
                 # Determine plan from amount
                 amount = session.get('amount_total', 0) / 100
@@ -3624,7 +3676,7 @@ async def stripe_webhook(request: Request):
                 elif amount >= 19:
                     plan = "growth"
                 
-                # Upgrade account if email matches existing user
+                # Upgrade account and setup billing cycle
                 if auth_system and hasattr(auth_system, 'upgrade_customer'):
                     try:
                         tier_map = {
@@ -3636,15 +3688,97 @@ async def stripe_webhook(request: Request):
                         
                         if auth_system.upgrade_customer(customer_email, new_tier):
                             print(f"🎯 Successfully upgraded {customer_email} to {new_tier} tier")
+                            
+                            # Setup billing cycle in usage tracker
+                            if usage_tracker:
+                                customer = auth_system.get_customer_by_email(customer_email)
+                                if customer:
+                                    usage_tracker.setup_billing_cycle(
+                                        user_id=customer.customer_id,
+                                        subscription_id=subscription_id or f"manual_{int(time.time())}",
+                                        plan_type=new_tier,
+                                        start_date=datetime.now()
+                                    )
+                                    print(f"📅 Billing cycle setup for {customer_email}")
                         else:
                             print(f"📋 Payment received but no account found for {customer_email}")
-                            print(f"💡 User must register with email {customer_email} to access paid features")
                     except Exception as e:
                         print(f"⚠️  Account upgrade process failed: {e}")
-                else:
-                    print(f"⚠️  Auth system not available for upgrade processing")
         
-        return {"status": "success", "message": "webhook processed"}
+        # Handle recurring payment success
+        elif event_type == 'invoice.payment_succeeded':
+            invoice = event['data']['object']
+            customer_email = invoice.get('customer_email')
+            subscription_id = invoice.get('subscription')
+            
+            if customer_email and subscription_id:
+                print(f"🔄 Recurring payment succeeded for: {customer_email}")
+                
+                # Reset billing cycle for new month
+                if usage_tracker:
+                    try:
+                        usage_tracker.reset_monthly_usage(customer_email, subscription_id)
+                        print(f"📅 Monthly usage reset for {customer_email}")
+                    except Exception as e:
+                        print(f"⚠️  Monthly reset failed: {e}")
+                
+                # Reactivate subscription if it was suspended
+                if auth_system:
+                    try:
+                        auth_system.reactivate_subscription(customer_email)
+                        print(f"✅ Subscription reactivated for {customer_email}")
+                    except Exception as e:
+                        print(f"⚠️  Reactivation failed: {e}")
+        
+        # Handle payment failure
+        elif event_type == 'invoice.payment_failed':
+            invoice = event['data']['object']
+            customer_email = invoice.get('customer_email')
+            
+            if customer_email:
+                print(f"❌ Payment failed for: {customer_email}")
+                
+                # Don't immediately deactivate - Stripe will retry
+                # Just log for monitoring
+                print(f"💳 Payment retry will be attempted automatically")
+        
+        # Handle subscription cancellation
+        elif event_type == 'customer.subscription.deleted':
+            subscription = event['data']['object']
+            customer_email = subscription.get('customer_email') or subscription.get('metadata', {}).get('email')
+            
+            if customer_email:
+                print(f"🛑 Subscription cancelled for: {customer_email}")
+                
+                # Deactivate subscription access
+                if auth_system:
+                    try:
+                        auth_system.deactivate_subscription(customer_email)
+                        print(f"🚫 Access deactivated for {customer_email}")
+                    except Exception as e:
+                        print(f"⚠️  Deactivation failed: {e}")
+        
+        # Handle successful subscription creation
+        elif event_type == 'customer.subscription.created':
+            subscription = event['data']['object']
+            customer_email = subscription.get('customer_email') or subscription.get('metadata', {}).get('email')
+            subscription_id = subscription.get('id')
+            
+            if customer_email and subscription_id:
+                print(f"✅ Subscription created: {subscription_id} for {customer_email}")
+                
+                # Link subscription to user in usage tracker
+                if usage_tracker:
+                    try:
+                        usage_tracker.link_subscription(
+                            customer_email=customer_email,
+                            subscription_id=subscription_id
+                        )
+                        print(f"🔗 Subscription linked in usage tracker")
+                    except Exception as e:
+                        print(f"⚠️  Subscription linking failed: {e}")
+        
+        return {"status": "success", "message": f"webhook {event_type} processed"}
         
     except Exception as e:
         print(f"❌ Webhook error: {e}")

@@ -344,5 +344,218 @@ class UsageTracker:
             print(f"Error resetting monthly usage: {e}")
             return False
 
+    def check_and_reset_billing_cycle(self, user_id: str) -> Dict[str, Any]:
+        """Check if billing cycle needs reset and reset if needed"""
+        try:
+            with self.get_db_connection() as conn:
+                # Get current billing cycle info
+                cursor = conn.execute('''
+                    SELECT billing_cycle_start, billing_cycle_end 
+                    FROM user_limits 
+                    WHERE user_id = ?
+                ''', (user_id,))
+                
+                result = cursor.fetchone()
+                if not result:
+                    return {"success": False, "error": "User not found"}
+                
+                cycle_start, cycle_end = result
+                current_time = datetime.now()
+                
+                # Convert string dates back to datetime objects
+                if isinstance(cycle_start, str):
+                    cycle_start = datetime.fromisoformat(cycle_start)
+                if isinstance(cycle_end, str):
+                    cycle_end = datetime.fromisoformat(cycle_end)
+                
+                # Check if cycle has ended
+                if current_time > cycle_end:
+                    # Reset billing cycle
+                    new_start = current_time
+                    new_end = new_start + timedelta(days=30)
+                    
+                    # Update billing cycle
+                    conn.execute('''
+                        UPDATE user_limits 
+                        SET billing_cycle_start = ?, billing_cycle_end = ?, pages_used_this_month = 0
+                        WHERE user_id = ?
+                    ''', (new_start, new_end, user_id))
+                    
+                    conn.commit()
+                    print(f"🔄 Billing cycle reset for user {user_id}")
+                    
+                    return {
+                        "success": True,
+                        "cycle_reset": True,
+                        "new_cycle_start": new_start,
+                        "new_cycle_end": new_end
+                    }
+                
+                return {"success": True, "cycle_reset": False}
+                
+        except Exception as e:
+            print(f"❌ Billing cycle check failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def record_overage_usage(self, user_id: str, overage_pages: int, overage_cost: float, invoice_id: str = None) -> Dict[str, Any]:
+        """Record overage usage for billing"""
+        try:
+            timestamp = datetime.now()
+            
+            with self.get_db_connection() as conn:
+                # Create overage_usage table if it doesn't exist
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS overage_usage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        overage_pages INTEGER NOT NULL,
+                        overage_cost REAL NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        invoice_id TEXT,
+                        billed BOOLEAN DEFAULT FALSE
+                    )
+                ''')
+                
+                # Record overage
+                conn.execute('''
+                    INSERT INTO overage_usage 
+                    (user_id, overage_pages, overage_cost, timestamp, invoice_id, billed)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (user_id, overage_pages, overage_cost, timestamp.isoformat(), invoice_id, invoice_id is not None))
+                
+                conn.commit()
+                
+            return {
+                "success": True,
+                "overage_recorded": True,
+                "pages": overage_pages,
+                "cost": overage_cost
+            }
+            
+        except Exception as e:
+            print(f"❌ Overage recording failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def record_ai_usage(self, user_id: str, ai_cost: float) -> Dict[str, Any]:
+        """Record AI usage cost"""
+        try:
+            timestamp = datetime.now()
+            
+            with self.get_db_connection() as conn:
+                # Create ai_usage table if it doesn't exist
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS ai_usage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        ai_cost REAL NOT NULL,
+                        timestamp TEXT NOT NULL
+                    )
+                ''')
+                
+                # Record AI usage
+                conn.execute('''
+                    INSERT INTO ai_usage (user_id, ai_cost, timestamp)
+                    VALUES (?, ?, ?)
+                ''', (user_id, ai_cost, timestamp.isoformat()))
+                
+                conn.commit()
+                
+            return {"success": True, "ai_cost_recorded": ai_cost}
+            
+        except Exception as e:
+            print(f"❌ AI usage recording failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def setup_billing_cycle(self, user_id: str, subscription_id: str, plan_type: str, start_date: datetime) -> Dict[str, Any]:
+        """Setup initial billing cycle for new subscription"""
+        try:
+            end_date = start_date + timedelta(days=30)
+            
+            # Get plan limits
+            plan_limits = {
+                "student": {"pages": 500, "rate": 0.01},
+                "growth": {"pages": 2500, "rate": 0.008},
+                "business": {"pages": 10000, "rate": 0.008}
+            }
+            
+            limits = plan_limits.get(plan_type, {"pages": 100, "rate": 0.02})
+            
+            with self.get_db_connection() as conn:
+                # Insert or update user limits
+                conn.execute('''
+                    INSERT OR REPLACE INTO user_limits 
+                    (user_id, subscription_id, plan_type, pages_included, pages_used_this_month, 
+                     overage_rate, billing_cycle_start, billing_cycle_end)
+                    VALUES (?, ?, ?, ?, 0, ?, ?, ?)
+                ''', (user_id, subscription_id, plan_type, limits["pages"], 
+                      limits["rate"], start_date.isoformat(), end_date.isoformat()))
+                
+                conn.commit()
+                
+            return {
+                "success": True,
+                "billing_cycle_setup": True,
+                "plan": plan_type,
+                "pages_included": limits["pages"]
+            }
+            
+        except Exception as e:
+            print(f"❌ Billing cycle setup failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def reset_monthly_usage(self, customer_email: str, subscription_id: str) -> Dict[str, Any]:
+        """Reset monthly usage for new billing cycle"""
+        try:
+            with self.get_db_connection() as conn:
+                # Reset pages used this month
+                cursor = conn.execute('''
+                    UPDATE user_limits 
+                    SET pages_used_this_month = 0,
+                        billing_cycle_start = ?,
+                        billing_cycle_end = ?
+                    WHERE subscription_id = ?
+                ''', (datetime.now().isoformat(), 
+                      (datetime.now() + timedelta(days=30)).isoformat(),
+                      subscription_id))
+                
+                rows_affected = cursor.rowcount
+                conn.commit()
+                
+            return {
+                "success": True,
+                "usage_reset": rows_affected > 0,
+                "subscription_id": subscription_id
+            }
+            
+        except Exception as e:
+            print(f"❌ Monthly usage reset failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def link_subscription(self, customer_email: str, subscription_id: str) -> Dict[str, Any]:
+        """Link Stripe subscription to user account"""
+        try:
+            with self.get_db_connection() as conn:
+                # Update subscription_id for the user
+                cursor = conn.execute('''
+                    UPDATE user_limits 
+                    SET subscription_id = ?
+                    WHERE user_id IN (
+                        SELECT customer_id FROM customers WHERE email = ?
+                    )
+                ''', (subscription_id, customer_email))
+                
+                rows_affected = cursor.rowcount
+                conn.commit()
+                
+            return {
+                "success": True,
+                "linked": rows_affected > 0,
+                "subscription_id": subscription_id
+            }
+            
+        except Exception as e:
+            print(f"❌ Subscription linking failed: {e}")
+            return {"success": False, "error": str(e)}
+
 # Global instance
 usage_tracker = UsageTracker()
