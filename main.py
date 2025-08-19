@@ -3638,7 +3638,8 @@ async def parse_pdf_advanced(
                         traceback.print_exc()
                 else:
                     print(f"⚠️  Usage tracking skipped - user_id: {user_id}, usage_tracker: {usage_tracker is not None}")
-                elif not current_user:
+                
+                if not current_user:
                     # Track free tier usage (for analytics)
                     print(f"Free tier usage: {pages_processed} pages processed")
                 
