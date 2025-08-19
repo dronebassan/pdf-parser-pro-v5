@@ -184,10 +184,30 @@ class UsageTracker:
             # Get user limits
             user_limits = self.get_user_limits(user_id)
             if not user_limits:
-                return {
-                    "success": False,
-                    "error": "User limits not found. Please check subscription."
-                }
+                # AUTO-CREATE user limits for existing users who don't have them
+                print(f"🔧 Auto-creating user limits for {user_id}")
+                from datetime import datetime, timedelta
+                cycle_start = datetime.now()
+                cycle_end = cycle_start + timedelta(days=30)
+                
+                # Default to free tier limits
+                self.update_user_limits(
+                    user_id=user_id,
+                    subscription_id="auto_created",
+                    plan_type="free",
+                    pages_included=10,
+                    overage_rate=0.02,
+                    billing_cycle_start=cycle_start,
+                    billing_cycle_end=cycle_end
+                )
+                
+                # Try to get limits again
+                user_limits = self.get_user_limits(user_id)
+                if not user_limits:
+                    return {
+                        "success": False,
+                        "error": "Could not create user limits"
+                    }
             
             # Get current usage
             current_usage = self.get_monthly_usage(user_id)
