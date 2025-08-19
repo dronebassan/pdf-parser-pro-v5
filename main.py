@@ -2212,7 +2212,7 @@ def pricing_page():
             .faq-answer {
                 color: var(--text-secondary);
                 line-height: 1.6;
-                padding: 0 1.5rem 1.5rem;
+                padding: 0;
                 max-height: 0;
                 overflow: hidden;
                 transition: max-height 0.3s ease, padding 0.3s ease;
