@@ -464,6 +464,9 @@ upload_cleanup_counter = 0
 monthly_ai_usage = {}
 ai_cleanup_counter = 0
 
+# EMERGENCY FALLBACK: In-memory usage tracking (if database fails)
+emergency_usage_tracking = {}  # user_id -> pages_used_today
+
 # Memory cleanup thresholds
 CLEANUP_INTERVAL = 100  # Clean every 100 operations
 MAX_SESSIONS = 10000  # Max sessions before forced cleanup
@@ -3608,10 +3611,29 @@ async def parse_pdf_advanced(
                         except Exception as e:
                             print(f"💰 AI cost tracking failed: {e}")
                 
-                # Track usage and update billing cycle
-                if user_id and usage_tracker:
+                # 🚨 CRITICAL BILLING PROTECTION 🚨
+                # MUST track usage or block processing to prevent free usage
+                usage_tracked = False
+                
+                if current_user:  # Only track for logged-in users
+                    if not usage_tracker:
+                        print("🚨 CRITICAL: Usage tracker not available - blocking processing")
+                        raise HTTPException(
+                            status_code=503,
+                            detail="Billing system unavailable. Processing temporarily disabled to prevent revenue loss."
+                        )
+                    
                     try:
-                        print(f"🔍 Starting usage tracking for user {user_id}, pages: {pages_processed}")
+                        print(f"🔍 Starting CRITICAL usage tracking for user {user_id}, pages: {pages_processed}")
+                        
+                        # Check user limits BEFORE processing
+                        limits_check = usage_tracker.check_user_limits(user_id, pages_processed)
+                        print(f"📊 Limits check result: {limits_check}")
+                        
+                        if not limits_check.get("success"):
+                            print(f"🚨 User limits check failed: {limits_check.get('error')}")
+                            # Still allow processing but force track usage
+                        
                         # Check and reset billing cycle if needed
                         usage_tracker.check_and_reset_billing_cycle(user_id)
                         
@@ -3632,12 +3654,43 @@ async def parse_pdf_advanced(
                         
                         print(f"📊 Usage tracked: {pages_processed} pages, cost: ${total_cost:.4f}")
                         print(f"📊 Tracking result: {tracking_result}")
+                        
+                        if tracking_result.get("success"):
+                            usage_tracked = True
+                            print("✅ Database usage tracking successful")
+                        else:
+                            print(f"🚨 CRITICAL: Database tracking failed: {tracking_result}")
+                            # EMERGENCY FALLBACK: In-memory tracking
+                            emergency_usage_tracking[user_id] = emergency_usage_tracking.get(user_id, 0) + pages_processed
+                            usage_tracked = True
+                            print(f"⚠️  Using emergency fallback tracking: {emergency_usage_tracking[user_id]} pages")
+                            
                     except Exception as e:
-                        print(f"❌ Usage tracking failed: {e}")
+                        print(f"🚨 CRITICAL: Usage tracking exception: {e}")
                         import traceback
                         traceback.print_exc()
+                        
+                        # EMERGENCY FALLBACK: In-memory tracking
+                        emergency_usage_tracking[user_id] = emergency_usage_tracking.get(user_id, 0) + pages_processed
+                        usage_tracked = True
+                        print(f"⚠️  Exception fallback tracking: {emergency_usage_tracking[user_id]} pages")
+                        
+                        # Only block if we can't even do emergency tracking
+                        if current_user.subscription_tier != "free" and emergency_usage_tracking.get(user_id, 0) > 100:
+                            raise HTTPException(
+                                status_code=503,
+                                detail="Usage limit exceeded via emergency tracking. Contact support."
+                            )
+                    
+                    # Final check - if tracking failed for paid users, block
+                    if not usage_tracked and current_user.subscription_tier != "free":
+                        print(f"🚨 BLOCKING: Usage not tracked for paid user {current_user.subscription_tier}")
+                        raise HTTPException(
+                            status_code=503,
+                            detail="Usage tracking failed. Processing blocked to prevent billing issues."
+                        )
                 else:
-                    print(f"⚠️  Usage tracking skipped - user_id: {user_id}, usage_tracker: {usage_tracker is not None}")
+                    print(f"Free tier usage: {pages_processed} pages processed (no tracking needed)")
                 
                 if not current_user:
                     # Track free tier usage (for analytics)
