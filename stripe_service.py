@@ -38,13 +38,24 @@ try:
         stripe.api_key = stripe_api_key.strip()
         print(f"✅ Stripe API key set: {stripe_api_key[:12]}...")
         
-        # Test the API key immediately
+        # Test the API key with safer approach
         try:
-            test_result = stripe.Account.retrieve()
-            if test_result and hasattr(test_result, 'id'):
-                print(f"✅ Stripe API key WORKS - Account ID: {test_result.id}")
-            else:
-                print(f"✅ Stripe API key connected but account object format unexpected")
+            print("🔍 Testing Stripe API key...")
+            
+            # Use a simpler test - just list payment methods which should always work
+            test_result = stripe.PaymentMethod.list(limit=1)
+            print(f"✅ Stripe API key WORKS - Connection successful")
+            
+            # Try to get account info (optional)
+            try:
+                account = stripe.Account.retrieve()
+                if account and hasattr(account, 'id'):
+                    print(f"✅ Account verified - ID: {account.id}")
+                    if hasattr(account, 'business_profile') and account.business_profile:
+                        if hasattr(account.business_profile, 'name') and account.business_profile.name:
+                            print(f"✅ Business name: {account.business_profile.name}")
+            except Exception as account_error:
+                print(f"⚠️  Account info not accessible: {account_error}")
             
             # List available products and prices for debugging
             try:
@@ -64,6 +75,7 @@ try:
         except Exception as test_error:
             print(f"❌ Stripe API key test failed: {test_error}")
             print(f"   Error type: {type(test_error).__name__}")
+            print(f"   Error details: {str(test_error)}")
             # Don't disable Stripe entirely - just log the error
             print("⚠️  Continuing with Stripe service despite test failure")
         

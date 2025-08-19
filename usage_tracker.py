@@ -45,10 +45,14 @@ class UsageTracker:
         self.pool_lock = threading.Lock()
         
         try:
-            self.init_database()
+            # Initialize database first with direct connection
+            self._init_database_direct()
             print("✅ Database initialized successfully")
         except Exception as e:
             print(f"❌ Database initialization failed: {e}")
+            print(f"❌ Error type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
             raise
             
         try:
@@ -56,7 +60,71 @@ class UsageTracker:
             print("✅ Connection pool initialized successfully")
         except Exception as e:
             print(f"❌ Connection pool initialization failed: {e}")
+            import traceback
+            traceback.print_exc()
             raise
+    
+    def _init_database_direct(self):
+        """Initialize database with direct connection (before pool is ready)"""
+        import sqlite3
+        
+        print(f"🔍 Creating direct connection to {self.db_path}")
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        
+        try:
+            # Usage records table
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS usage_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    subscription_id TEXT NOT NULL,
+                    pages_processed INTEGER NOT NULL,
+                    timestamp DATETIME NOT NULL,
+                    document_name TEXT,
+                    processing_strategy TEXT,
+                    ai_used BOOLEAN,
+                    cost_estimate REAL,
+                    billing_period TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # User limits table
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS user_limits (
+                    user_id TEXT PRIMARY KEY,
+                    subscription_id TEXT NOT NULL,
+                    plan_type TEXT NOT NULL,
+                    pages_included INTEGER NOT NULL,
+                    overage_rate REAL NOT NULL,
+                    billing_cycle_start DATETIME NOT NULL,
+                    billing_cycle_end DATETIME NOT NULL,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Monthly usage summary table
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS monthly_usage (
+                    user_id TEXT,
+                    billing_period TEXT,
+                    total_pages INTEGER DEFAULT 0,
+                    total_ai_pages INTEGER DEFAULT 0,
+                    total_cost REAL DEFAULT 0.0,
+                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, billing_period)
+                )
+            ''')
+            
+            conn.commit()
+            print(f"✅ Database tables created successfully")
+            
+        except Exception as e:
+            print(f"❌ Database table creation failed: {e}")
+            raise
+        finally:
+            conn.close()
     
     def init_database(self):
         """Initialize SQLite database for usage tracking"""
