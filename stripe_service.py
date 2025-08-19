@@ -248,6 +248,62 @@ class StripeService:
                 "error": str(e)
             }
     
+    def cancel_subscription(self, customer_email: str) -> Dict[str, Any]:
+        """Cancel all active subscriptions for a customer by email"""
+        
+        if not stripe:
+            return {
+                "success": False,
+                "error": "Stripe not available"
+            }
+        
+        try:
+            # Find customer by email
+            customers = stripe.Customer.list(email=customer_email, limit=10)
+            
+            if not customers.data:
+                return {
+                    "success": False,
+                    "error": "No customer found with this email"
+                }
+            
+            canceled_count = 0
+            for customer in customers.data:
+                # Get all active subscriptions for this customer
+                subscriptions = stripe.Subscription.list(
+                    customer=customer.id,
+                    status="active",
+                    limit=10
+                )
+                
+                # Cancel all active subscriptions
+                for subscription in subscriptions.data:
+                    try:
+                        canceled_sub = stripe.Subscription.cancel(subscription.id)
+                        canceled_count += 1
+                        print(f"✅ Canceled subscription {subscription.id} for {customer_email}")
+                    except Exception as cancel_error:
+                        print(f"❌ Failed to cancel subscription {subscription.id}: {cancel_error}")
+            
+            if canceled_count > 0:
+                return {
+                    "success": True,
+                    "message": f"Successfully canceled {canceled_count} subscription(s)",
+                    "canceled_count": canceled_count
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "No active subscriptions found to cancel"
+                }
+            
+        except Exception as e:
+            print(f"❌ Error canceling subscription: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
     def get_subscription_info(self, subscription_id: str) -> Dict[str, Any]:
         """Get subscription information from Stripe"""
         

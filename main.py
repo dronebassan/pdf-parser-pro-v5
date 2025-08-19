@@ -4400,16 +4400,33 @@ async def cancel_subscription(current_user = Depends(get_current_user_optional))
         if current_user.subscription_tier == "free":
             return JSONResponse({"success": False, "error": "Already on free plan"})
         
-        # Direct cancellation - downgrade to free tier
+        # COMPLETE CANCELLATION: Cancel in Stripe AND downgrade locally
+        stripe_result = {"success": False, "error": "Stripe not available"}
+        
+        # 1. Cancel all Stripe subscriptions for this user
+        if stripe_service and stripe_service.available:
+            try:
+                stripe_result = stripe_service.cancel_subscription(current_user.email)
+                print(f"🔥 Stripe cancellation result: {stripe_result}")
+            except Exception as e:
+                print(f"❌ Stripe cancellation failed: {e}")
+                stripe_result = {"success": False, "error": str(e)}
+        
+        # 2. Downgrade user locally (always do this, even if Stripe fails)
         if auth_system:
             auth_system.upgrade_customer(current_user.api_key, "free")
-            
-            # Update customer object in memory
             current_user.subscription_tier = "free"
+            
+            message = "Subscription canceled successfully. You are now on the free plan."
+            if stripe_result.get("success"):
+                message += f" Canceled {stripe_result.get('canceled_count', 0)} Stripe subscription(s)."
+            else:
+                message += " Note: Stripe cancellation may have failed - contact support if you continue to be charged."
             
             return JSONResponse({
                 "success": True,
-                "message": "Subscription canceled successfully. You are now on the free plan."
+                "message": message,
+                "stripe_canceled": stripe_result.get("success", False)
             })
         else:
             return JSONResponse({"success": False, "error": "Cancellation service unavailable"})
