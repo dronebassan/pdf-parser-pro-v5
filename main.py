@@ -305,6 +305,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 # Simple session storage (in production, use Redis or database)
 active_sessions = {}
 
+# Rate limiting storage (user_id -> list of timestamps)
+user_upload_history = {}
+
+# AI usage tracking (user_id -> count this month)
+monthly_ai_usage = {}
+
 # Optional authentication for free tier
 async def get_current_user_optional(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Get current user, but allow unauthenticated access for free tier"""
@@ -2763,6 +2769,54 @@ async def parse_pdf_advanced(
     pages_processed = 0
     ai_used = False
     
+    # 1. FILE SIZE PROTECTION - Prevent server overload
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB limit
+    content_size = len(content)
+    if content_size > MAX_FILE_SIZE:
+        size_mb = content_size / (1024 * 1024)
+        raise HTTPException(
+            status_code=413, 
+            detail=f"File too large ({size_mb:.1f}MB). Maximum size is 50MB. Please split large documents or use a smaller file."
+        )
+    
+    # 2. RATE LIMITING PROTECTION - Prevent spam and server overload
+    import time as time_module
+    current_time = time_module.time()
+    
+    # Different limits for different user types
+    if current_user:
+        # Authenticated users: more generous limits
+        user_key = f"user_{current_user.customer_id}"
+        max_uploads_per_hour = 20  # 20 uploads per hour for paid users
+    else:
+        # Anonymous users: strict limits
+        user_key = f"anon_{request.client.host}"
+        max_uploads_per_hour = 5   # 5 uploads per hour for free users
+    
+    # Clean old entries (older than 1 hour)
+    if user_key in user_upload_history:
+        user_upload_history[user_key] = [
+            timestamp for timestamp in user_upload_history[user_key]
+            if current_time - timestamp < 3600  # 1 hour = 3600 seconds
+        ]
+    else:
+        user_upload_history[user_key] = []
+    
+    # Check rate limit
+    if len(user_upload_history[user_key]) >= max_uploads_per_hour:
+        time_until_reset = 3600 - (current_time - user_upload_history[user_key][0])
+        minutes_left = int(time_until_reset / 60)
+        
+        if current_user:
+            detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Try again in {minutes_left} minutes, or upgrade for higher limits."
+        else:
+            detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Create a free account for higher limits, or try again in {minutes_left} minutes."
+            
+        raise HTTPException(status_code=429, detail=detail)
+    
+    # Record this upload
+    user_upload_history[user_key].append(current_time)
+    
     # Determine user info and limits
     user_id = None
     subscription_tier = "free"
@@ -2794,6 +2848,16 @@ async def parse_pdf_advanced(
             # 1 "page" = exactly 2000 characters of content
             CHARS_PER_PAGE = 2000
             char_count = len(total_text.strip())
+            
+            # 4. CHARACTER LIMIT PROTECTION - Prevent massive documents
+            MAX_CHAR_COUNT = 200000  # ~100 pages worth of content (200k chars)
+            if char_count > MAX_CHAR_COUNT:
+                estimated_pages = char_count // CHARS_PER_PAGE
+                max_pages = MAX_CHAR_COUNT // CHARS_PER_PAGE
+                raise HTTPException(
+                    status_code=413, 
+                    detail=f"Document too large: {estimated_pages} pages of content (max {max_pages} pages). Please split this document or use a smaller file."
+                )
             
             if char_count == 0:
                 # No extractable text (pure images/scanned docs)
@@ -2854,10 +2918,47 @@ async def parse_pdf_advanced(
                 }
                 
                 parse_strategy = strategy_map.get(strategy, ParseStrategy.AUTO)
+                
+                # 3. AI COST PROTECTION - Prevent expensive AI abuse
+                if current_user:
+                    user_ai_key = f"ai_{current_user.customer_id}"
+                    subscription_tier = current_user.subscription_tier
+                    
+                    # Clean old AI usage (reset monthly)
+                    import datetime
+                    current_month = datetime.datetime.now().strftime("%Y-%m")
+                    if user_ai_key not in monthly_ai_usage:
+                        monthly_ai_usage[user_ai_key] = {"month": current_month, "count": 0}
+                    elif monthly_ai_usage[user_ai_key]["month"] != current_month:
+                        monthly_ai_usage[user_ai_key] = {"month": current_month, "count": 0}
+                    
+                    # Set AI limits per subscription tier
+                    ai_limits = {
+                        "free": 5,      # 5 AI-processed documents per month
+                        "student": 25,  # 25 AI-processed documents per month  
+                        "growth": 100,  # 100 AI-processed documents per month
+                        "business": 500 # 500 AI-processed documents per month
+                    }
+                    
+                    max_ai_usage = ai_limits.get(subscription_tier, 5)
+                    current_ai_usage = monthly_ai_usage[user_ai_key]["count"]
+                    
+                    # Force library-only parsing if AI limit exceeded
+                    if current_ai_usage >= max_ai_usage:
+                        print(f"🛡️  AI limit reached for {subscription_tier} user ({current_ai_usage}/{max_ai_usage}). Forcing library-only parsing.")
+                        parse_strategy = ParseStrategy.LIBRARY_ONLY
+                        
                 result = smart_parser.parse_pdf(tmp_path, parse_strategy, preferred_llm)
                 
                 # Check if AI was used
                 ai_used = result.fallback_triggered or "ai" in result.method_used.lower() or "llm" in result.method_used.lower()
+                
+                # Track AI usage for cost protection
+                if ai_used and current_user:
+                    user_ai_key = f"ai_{current_user.customer_id}"
+                    if user_ai_key in monthly_ai_usage:
+                        monthly_ai_usage[user_ai_key]["count"] += 1
+                        print(f"💰 AI usage tracked: {monthly_ai_usage[user_ai_key]['count']} for {current_user.subscription_tier} user")
                 
                 # Track usage for billing
                 if user_id and usage_tracker:
