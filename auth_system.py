@@ -10,7 +10,16 @@ import bcrypt
 from typing import Optional, Dict
 from dataclasses import dataclass
 from fastapi import HTTPException, Depends, Header
-from api_key_manager import api_key_manager, SubscriptionTier
+# Import removed to fix deployment crash
+try:
+    from api_key_manager import api_key_manager, SubscriptionTier
+except ImportError:
+    api_key_manager = None
+    class SubscriptionTier:
+        FREE = "free"
+        STUDENT = "student" 
+        GROWTH = "growth"
+        BUSINESS = "business"
 
 @dataclass
 class Customer:
@@ -62,10 +71,12 @@ class AuthSystem:
         self.customers[email] = customer  # Store by email for easy lookup
         
         # Create customer config in API key manager  
-        try:
-            api_key_manager.create_customer(customer_id, email, subscription_tier)
-        except:
-            pass  # Don't let this break registration
+        if api_key_manager:
+            try:
+                api_key_manager.create_customer(customer_id, email, subscription_tier)
+            except Exception as e:
+                print(f"API key manager error: {e}")
+                pass  # Don't let this break registration
         
         return customer
     
