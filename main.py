@@ -1266,7 +1266,7 @@ def home():
                         <i class="fas fa-cloud-upload-alt"></i>
                     </div>
                     <h3>Upload Your PDF - FREE</h3>
-                    <p>Process up to 10 pages with full AI features • No registration required</p>
+                    <p>Try up to 3 PDFs per hour • Create free account for 15/hour + AI features</p>
                     <input type="file" id="fileInput" style="display: none;" accept=".pdf" onchange="handleFileSelect(event)">
                 </div>
                 
@@ -2289,7 +2289,7 @@ def pricing_page():
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">No credit card required</div>
                     <div class="plan-description">Try our basic PDF processing</div>
                     <ul class="plan-features">
-                        <li><i class="fas fa-check"></i> 10 pages per document</li>
+                        <li><i class="fas fa-check"></i> 3/hour (anonymous) or 15/hour + 10 pages/month (account)</li>
                         <li><i class="fas fa-check"></i> Library-based parsing</li>
                         <li><i class="fas fa-check"></i> OCR for scanned PDFs</li>
                         <li><i class="fas fa-times" style="color: var(--text-muted);"></i> <span style="color: var(--text-muted);">AI processing (upgrade required)</span></li>
@@ -2363,7 +2363,7 @@ def pricing_page():
                 <div class="faq-grid">
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">How do I get started?</div>
-                        <div class="faq-answer">Create a free account to get 10 pages/month. For unlimited AI features and higher limits, choose a paid plan. Email verification is required for paid subscriptions.</div>
+                        <div class="faq-answer">Try 3 PDFs/hour without account, or create free account for 15/hour + 10 pages/month tracked usage. For AI features and higher limits, choose a paid plan. Email verification required for paid subscriptions.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">How does the billing work?</div>
@@ -2371,7 +2371,7 @@ def pricing_page():
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">What's the difference between free and paid plans?</div>
-                        <div class="faq-answer">Free accounts get basic library processing (10 pages/month). Paid plans include revolutionary AI-powered processing with Google Gemini 2.5 Flash for complex layouts, tables, and superior accuracy.</div>
+                        <div class="faq-answer">Anonymous users: 3/hour basic processing. Free accounts: 15/hour + 10 pages/month tracked. Paid plans: AI-powered processing with Google Gemini 2.5 Flash for complex layouts, tables, and superior accuracy.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Do I need to manage API keys manually?</div>
@@ -2387,11 +2387,11 @@ def pricing_page():
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">What are the upload limits?</div>
-                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free (2/hour), Student (5/hour), Growth (15/hour), Business (50/hour). Anonymous users: 1/hour.</div>
+                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free accounts (15/hour), Student (40/hour), Growth (120/hour), Business (300/hour). Anonymous users: 3/hour.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Can I cancel anytime?</div>
-                        <div class="faq-answer">Yes! Go to your Account Dashboard (after logging in) and click "Manage Subscription" to cancel through Stripe. You keep access until your current billing period ends, then automatically switch to free tier (10 pages/month).</div>
+                        <div class="faq-answer">Yes! Go to your Account Dashboard (after logging in) and click "Manage Subscription" to cancel through Stripe. You keep access until your current billing period ends, then automatically switch to free tier (15/hour + 10 pages/month).</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">I can't log in after purchasing. What's wrong?</div>
@@ -2403,7 +2403,7 @@ def pricing_page():
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">What happens to my account if payment fails?</div>
-                        <div class="faq-answer">Stripe automatically retries failed payments. If ultimately unsuccessful, your account switches to free tier (10 pages/month) until payment is resolved.</div>
+                        <div class="faq-answer">Stripe automatically retries failed payments. If ultimately unsuccessful, your account switches to free tier (15/hour + 10 pages/month) until payment is resolved.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Do you have an API?</div>
