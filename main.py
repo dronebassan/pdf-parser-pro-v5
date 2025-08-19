@@ -452,14 +452,76 @@ async def get_current_user(request: Request, credentials: HTTPAuthorizationCrede
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
-# Simple session storage (in production, use Redis or database)
+# Simple session storage with cleanup (in production, use Redis)
 active_sessions = {}
+session_cleanup_counter = 0
 
-# Rate limiting storage (user_id -> list of timestamps)
+# Rate limiting storage with cleanup (user_id -> list of timestamps)  
 user_upload_history = {}
+upload_cleanup_counter = 0
 
-# AI usage tracking (user_id -> count this month)
+# AI usage tracking with cleanup (user_id -> count this month)
 monthly_ai_usage = {}
+ai_cleanup_counter = 0
+
+# Memory cleanup thresholds
+CLEANUP_INTERVAL = 100  # Clean every 100 operations
+MAX_SESSIONS = 10000  # Max sessions before forced cleanup
+MAX_UPLOAD_HISTORY = 5000  # Max upload records
+
+def cleanup_memory():
+    """Clean up old sessions and data to prevent memory bloat"""
+    global session_cleanup_counter, upload_cleanup_counter, ai_cleanup_counter
+    
+    # Clean sessions
+    session_cleanup_counter += 1
+    if session_cleanup_counter >= CLEANUP_INTERVAL:
+        session_cleanup_counter = 0
+        if len(active_sessions) > MAX_SESSIONS:
+            # Keep only the most recent sessions (simple FIFO)
+            sessions_to_keep = MAX_SESSIONS // 2
+            session_items = list(active_sessions.items())
+            active_sessions.clear()
+            active_sessions.update(session_items[-sessions_to_keep:])
+            print(f"🧹 Cleaned sessions: kept {sessions_to_keep} of {len(session_items)}")
+    
+    # Clean upload history  
+    upload_cleanup_counter += 1
+    if upload_cleanup_counter >= CLEANUP_INTERVAL:
+        upload_cleanup_counter = 0
+        current_time = time.time()
+        cleaned_count = 0
+        for key in list(user_upload_history.keys()):
+            # Remove entries older than 2 hours
+            old_length = len(user_upload_history[key])
+            user_upload_history[key] = [
+                timestamp for timestamp in user_upload_history[key]
+                if current_time - timestamp < 7200  # 2 hours
+            ]
+            cleaned_count += old_length - len(user_upload_history[key])
+            # Remove empty keys
+            if not user_upload_history[key]:
+                del user_upload_history[key]
+        if cleaned_count > 0:
+            print(f"🧹 Cleaned upload history: removed {cleaned_count} old entries")
+    
+    # Clean AI usage (keep only current and previous month)
+    ai_cleanup_counter += 1
+    if ai_cleanup_counter >= CLEANUP_INTERVAL:
+        ai_cleanup_counter = 0
+        current_month = datetime.now().strftime("%Y-%m")
+        # Calculate previous month
+        prev_month_date = datetime.now().replace(day=1) - timedelta(days=1)
+        prev_month = prev_month_date.strftime("%Y-%m")
+        
+        cleaned_count = 0
+        for key in list(monthly_ai_usage.keys()):
+            usage_month = monthly_ai_usage[key].get("month", "")
+            if usage_month not in [current_month, prev_month]:
+                del monthly_ai_usage[key]
+                cleaned_count += 1
+        if cleaned_count > 0:
+            print(f"🧹 Cleaned AI usage: removed {cleaned_count} old entries")
 
 # Optional authentication for free tier
 async def get_current_user_optional(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -2867,6 +2929,7 @@ async def register_user(registration: UserRegistration, request: Request):
         import secrets
         session_token = secrets.token_urlsafe(32)
         active_sessions[session_token] = customer.email
+        cleanup_memory()  # Clean memory on each login
         
         from fastapi.responses import JSONResponse
         response_data = {
@@ -3154,6 +3217,7 @@ async def login_user(login: UserLogin):
         import secrets
         session_token = secrets.token_urlsafe(32)
         active_sessions[session_token] = customer.email
+        cleanup_memory()  # Clean memory on each login
         
         from fastapi.responses import JSONResponse
         response_data = {
@@ -3253,6 +3317,9 @@ async def parse_pdf_advanced(
     
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    # Read file content first
+    content = await file.read()
     
     start_time = time.time()
     pages_processed = 0
@@ -3355,7 +3422,6 @@ async def parse_pdf_advanced(
     try:
         # Save uploaded file
         with NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            content = await file.read()
             tmp_file.write(content)
             tmp_path = tmp_file.name
         
