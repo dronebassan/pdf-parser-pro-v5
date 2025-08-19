@@ -903,6 +903,16 @@ def home():
             </div>
         </nav>
 
+        <!-- Fair Usage Notice -->
+        <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border-bottom: 1px solid #d1d5db; padding: 0.75rem 0; text-align: center;">
+            <div style="max-width: 1200px; margin: 0 auto; padding: 0 2rem;">
+                <div style="font-size: 0.875rem; color: #374151; font-weight: 500;">
+                    <i class="fas fa-info-circle" style="color: #667eea; margin-right: 0.5rem;"></i>
+                    <strong>Fair Usage:</strong> 1 page credit = ~2,000 characters of content processed. This ensures accurate billing based on actual document complexity.
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content -->
         <main class="main-content">
             <!-- Hero Section -->
