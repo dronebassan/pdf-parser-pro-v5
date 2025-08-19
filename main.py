@@ -2171,18 +2171,56 @@ def pricing_page():
                 background: var(--background);
                 border: 1px solid var(--border-color);
                 border-radius: var(--border-radius);
-                padding: 1.5rem;
+                overflow: hidden;
+                transition: var(--transition);
+            }
+            
+            .faq-item:hover {
+                border-color: var(--primary-color);
             }
             
             .faq-question {
                 font-weight: 600;
                 color: var(--text-primary);
-                margin-bottom: 0.5rem;
+                padding: 1.5rem;
+                margin: 0;
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: var(--background);
+                transition: var(--transition);
+                user-select: none;
+            }
+            
+            .faq-question:hover {
+                background: var(--background-secondary);
+            }
+            
+            .faq-question::after {
+                content: '+';
+                font-size: 1.5rem;
+                font-weight: 300;
+                color: var(--primary-color);
+                transition: transform 0.3s ease;
+            }
+            
+            .faq-question.active::after {
+                transform: rotate(45deg);
             }
             
             .faq-answer {
                 color: var(--text-secondary);
                 line-height: 1.6;
+                padding: 0 1.5rem 1.5rem;
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height 0.3s ease, padding 0.3s ease;
+            }
+            
+            .faq-answer.active {
+                max-height: 200px;
+                padding: 0 1.5rem 1.5rem;
             }
             
             /* Responsive */
@@ -2324,24 +2362,52 @@ def pricing_page():
                 </div>
                 <div class="faq-grid">
                     <div class="faq-item">
-                        <div class="faq-question">How do I get started?</div>
-                        <div class="faq-answer">Create a free account to get 10 pages/month with basic processing. For AI-powered features and higher limits, choose a paid plan. Email verification is required for paid subscriptions.</div>
+                        <div class="faq-question" onclick="toggleFaq(this)">How do I get started?</div>
+                        <div class="faq-answer">Create a free account to get 10 pages/month. For unlimited AI features and higher limits, choose a paid plan. Email verification is required for paid subscriptions.</div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">What's the difference between free and paid plans?</div>
-                        <div class="faq-answer">Free accounts get basic library processing (10 pages/month). Paid plans include revolutionary AI-powered processing with Google Gemini 2.5 Flash for complex layouts, tables, and superior accuracy.</div>
-                    </div>
-                    <div class="faq-item">
-                        <div class="faq-question">How does billing work?</div>
+                        <div class="faq-question" onclick="toggleFaq(this)">How does the billing work?</div>
                         <div class="faq-answer">We use character-based billing: every 2,000 characters = 1 page. Overage fees apply if you exceed your monthly limit. Student: $0.01/page, Growth/Business: $0.008/page.</div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Is my data secure?</div>
-                        <div class="faq-answer">Yes! We have zero data retention - documents are processed and immediately deleted. Plus comprehensive security including IP validation, session protection, and abuse prevention.</div>
+                        <div class="faq-question" onclick="toggleFaq(this)">What's the difference between free and paid plans?</div>
+                        <div class="faq-answer">Free accounts get basic library processing (10 pages/month). Paid plans include revolutionary AI-powered processing with Google Gemini 2.5 Flash for complex layouts, tables, and superior accuracy.</div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Can I cancel anytime?</div>
+                        <div class="faq-question" onclick="toggleFaq(this)">Do I need to manage API keys manually?</div>
+                        <div class="faq-answer">No! API keys auto-renew based on your subscription status. They automatically extend when you're a paying customer and expire when subscriptions end.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">What file formats do you support?</div>
+                        <div class="faq-answer">We support PDF files with advanced OCR for scanned documents, intelligent text extraction, and AI-powered structure recognition for complex layouts.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">Is my data secure?</div>
+                        <div class="faq-answer">Yes! We have zero data retention - documents are processed and immediately deleted. Plus IP validation, session security, email verification, and comprehensive abuse protection.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">What are the upload limits?</div>
+                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free (2/hour), Student (5/hour), Growth (15/hour), Business (50/hour). Anonymous users: 1/hour.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">Can I cancel anytime?</div>
                         <div class="faq-answer">Yes! Cancel anytime through Stripe customer portal. You keep access until your current billing period ends, then automatically switch to free tier (10 pages/month).</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">I can't log in after purchasing. What's wrong?</div>
+                        <div class="faq-answer">Make sure you're using the same email address for both account creation AND payment. Check your email for verification code if using a paid plan.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">How does the AI processing work?</div>
+                        <div class="faq-answer">We use Google Gemini 2.5 Flash for intelligent document understanding. It analyzes layout, extracts tables, handles complex formatting, and provides superior accuracy over basic OCR.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">What happens to my account if payment fails?</div>
+                        <div class="faq-answer">Stripe automatically retries failed payments. If ultimately unsuccessful, your account switches to free tier (10 pages/month) until payment is resolved.</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question" onclick="toggleFaq(this)">Do you have an API?</div>
+                        <div class="faq-answer">Yes! Growth and Business plans include full API access with auto-renewing keys. Perfect for integrating PDF processing into your applications.</div>
                     </div>
                 </div>
             </section>
@@ -2432,6 +2498,24 @@ def pricing_page():
                     colno: event.colno
                 });
             });
+            
+            // FAQ Collapse functionality
+            function toggleFaq(questionElement) {
+                const answer = questionElement.nextElementSibling;
+                const isActive = questionElement.classList.contains('active');
+                
+                // Close all other FAQs
+                document.querySelectorAll('.faq-question').forEach(q => {
+                    q.classList.remove('active');
+                    q.nextElementSibling.classList.remove('active');
+                });
+                
+                // Toggle current FAQ
+                if (!isActive) {
+                    questionElement.classList.add('active');
+                    answer.classList.add('active');
+                }
+            }
         </script>
     </body>
     </html>
