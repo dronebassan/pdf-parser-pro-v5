@@ -3833,6 +3833,18 @@ async def create_checkout_session(request: CheckoutRequest, current_user = Depen
             }
         )
     
+    # PREVENT MULTIPLE SUBSCRIPTIONS: Block if user already has a paid plan
+    if current_user.subscription_tier != "free":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Already subscribed",
+                "message": f"You already have an active {current_user.subscription_tier} subscription. Cancel your current subscription before upgrading.",
+                "current_plan": current_user.subscription_tier,
+                "dashboard_url": "/dashboard"
+            }
+        )
+    
     # Your actual Payment Links from Stripe Dashboard  
     payment_links = {
         "student": "https://buy.stripe.com/4gM14m11zaRk2ELcT6e3e04",    # Student Plan: $4.99 CAD/month
@@ -4258,12 +4270,14 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                         <p><strong>Current Plan:</strong> {current_plan["name"]}</p>
                         <p><strong>Monthly Cost:</strong> {"$" + str(current_plan["price"]) if current_plan["price"] > 0 else "Free"}</p>
                         <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
-                            {"<button class='btn' onclick='openCustomerPortal()'>💳 Manage Subscription</button>" if current_user.subscription_tier != "free" else ""}
                             {"<button class='btn-secondary btn' onclick='cancelSubscription()' style='color: #dc2626; border-color: #dc2626;'>❌ Cancel Subscription</button>" if current_user.subscription_tier != "free" else ""}
                             <a href="/pricing" class="btn btn-secondary">
                                 <i class="fas fa-upgrade"></i>
                                 {"Upgrade Plan" if current_user.subscription_tier == "free" else "Change Plan"}
                             </a>
+                            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
+                                💡 <strong>One subscription per account policy:</strong> Cancel current plan before upgrading. No refunds available.
+                            </p>
                         </div>
                     </div>
                 </div>

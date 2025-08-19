@@ -6,12 +6,14 @@ Tracks page processing for billing and limits
 import os
 import json
 import time
+import threading
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 from enum import Enum
 import sqlite3
 from contextlib import contextmanager
+from queue import Queue
 
 @dataclass
 class UsageRecord:
@@ -38,7 +40,10 @@ class UserLimits:
 class UsageTracker:
     def __init__(self, db_path: str = "usage_tracking.db"):
         self.db_path = db_path
+        self.connection_pool = Queue(maxsize=10)  # Pool of 10 connections
+        self.pool_lock = threading.Lock()
         self.init_database()
+        self._init_connection_pool()
     
     def init_database(self):
         """Initialize SQLite database for usage tracking"""
@@ -89,15 +94,32 @@ class UsageTracker:
             
             conn.commit()
     
+    def _init_connection_pool(self):
+        """Initialize connection pool for better concurrency"""
+        for _ in range(10):
+            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")  # Better concurrency
+            conn.execute("PRAGMA synchronous=NORMAL")  # Faster writes
+            conn.execute("PRAGMA cache_size=10000")  # More memory cache
+            conn.execute("PRAGMA temp_store=memory")  # Temp tables in RAM
+            self.connection_pool.put(conn)
+    
     @contextmanager
     def get_db_connection(self):
-        """Get database connection with context manager"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
+        """Get database connection from pool with context manager"""
+        conn = None
         try:
+            conn = self.connection_pool.get(timeout=5)  # 5 second timeout
             yield conn
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            raise
         finally:
-            conn.close()
+            if conn:
+                conn.commit()
+                self.connection_pool.put(conn)
     
     def track_usage(self, 
                    user_id: str, 

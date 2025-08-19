@@ -235,14 +235,11 @@ class StripeService:
         """Create customer portal session for managing subscription"""
         
         try:
-            portal_session = stripe.billing_portal.Session.create(
-                customer=customer_id,
-                return_url=return_url,
-            )
-            
+            # DISABLED: No Stripe portal to prevent refunds and multiple subscriptions
+            # Users can only cancel via our direct cancel button
             return {
-                "success": True,
-                "portal_url": portal_session.url
+                "success": False,
+                "error": "Billing portal disabled. Use the Cancel Subscription button on your dashboard instead."
             }
             
         except Exception as e:
