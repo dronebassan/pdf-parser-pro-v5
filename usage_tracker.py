@@ -39,11 +39,24 @@ class UserLimits:
 
 class UsageTracker:
     def __init__(self, db_path: str = "usage_tracking.db"):
+        print(f"🔧 Initializing UsageTracker with db_path: {db_path}")
         self.db_path = db_path
         self.connection_pool = Queue(maxsize=10)  # Pool of 10 connections
         self.pool_lock = threading.Lock()
-        self.init_database()
-        self._init_connection_pool()
+        
+        try:
+            self.init_database()
+            print("✅ Database initialized successfully")
+        except Exception as e:
+            print(f"❌ Database initialization failed: {e}")
+            raise
+            
+        try:
+            self._init_connection_pool()
+            print("✅ Connection pool initialized successfully")
+        except Exception as e:
+            print(f"❌ Connection pool initialization failed: {e}")
+            raise
     
     def init_database(self):
         """Initialize SQLite database for usage tracking"""
@@ -131,9 +144,13 @@ class UsageTracker:
                    cost_estimate: float = 0.0) -> Dict[str, Any]:
         """Track page usage for a user"""
         
+        print(f"🔍 TRACK_USAGE called: user_id={user_id}, pages={pages_processed}")
+        
         try:
             timestamp = datetime.now()
             billing_period = self._get_billing_period(timestamp)
+            
+            print(f"📅 Billing period: {billing_period}")
             
             # Record usage
             with self.get_db_connection() as conn:
@@ -159,19 +176,26 @@ class UsageTracker:
                       user_id, billing_period, cost_estimate, timestamp))
                 
                 conn.commit()
+                print(f"✅ Database operations completed successfully")
             
             # Report to Stripe for billing
             from stripe_service import stripe_service
             stripe_result = stripe_service.track_usage(subscription_id, pages_processed)
             
-            return {
+            result = {
                 "success": True,
                 "pages_tracked": pages_processed,
                 "billing_period": billing_period,
                 "stripe_reported": stripe_result.get("success", False)
             }
             
+            print(f"✅ TRACK_USAGE returning: {result}")
+            return result
+            
         except Exception as e:
+            print(f"❌ TRACK_USAGE failed: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "success": False,
                 "error": str(e)
