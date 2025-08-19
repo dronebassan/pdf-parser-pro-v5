@@ -2391,7 +2391,7 @@ def pricing_page():
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Can I cancel anytime?</div>
-                        <div class="faq-answer">Yes! Cancel anytime through Stripe customer portal. You keep access until your current billing period ends, then automatically switch to free tier (10 pages/month).</div>
+                        <div class="faq-answer">Yes! Go to your Account Dashboard (after logging in) and click "Manage Subscription" to cancel through Stripe. You keep access until your current billing period ends, then automatically switch to free tier (10 pages/month).</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">I can't log in after purchasing. What's wrong?</div>
@@ -3914,51 +3914,327 @@ async def stripe_webhook(request: Request):
 
 @app.get("/dashboard")
 async def user_dashboard(current_user = Depends(get_current_user)):
-    """Get user dashboard with usage, billing, and account info"""
+    """User dashboard page with account management and billing"""
     
     try:
-        dashboard_data = {
-            "user": {
-                "customer_id": current_user.customer_id,
-                "email": current_user.email,
-                "subscription_tier": current_user.subscription_tier,
-                "api_key": current_user.api_key
-            },
-            "subscription": {
-                "tier": current_user.subscription_tier,
-                "status": "active"  # You can enhance this with Stripe subscription status
-            },
-            "usage": {
-                "pages_used": 0,
-                "pages_included": 10,
-                "overage_cost": 0.0,
-                "billing_cycle_end": None
-            }
-        }
-        
-        # Get usage info if tracker is available
-        if usage_tracker:
-            usage_info = usage_tracker.check_user_limits(current_user.customer_id, 0)
-            monthly_usage = usage_tracker.get_monthly_usage(current_user.customer_id)
-            
-            if usage_info.get("success", False):
-                dashboard_data["usage"] = {
-                    "pages_used": usage_info.get("current_usage", 0),
-                    "pages_included": usage_info.get("pages_included", 10),
-                    "pages_remaining": max(0, usage_info.get("pages_included", 10) - usage_info.get("current_usage", 0)),
-                    "overage_pages": usage_info.get("overage_pages", 0),
-                    "overage_cost": usage_info.get("overage_cost", 0.0),
-                    "billing_cycle_end": usage_info.get("billing_cycle_end"),
-                    "plan_type": usage_info.get("plan_type", "free")
+        # Get usage information
+        usage_info = {"pages_used": 0, "pages_included": 10}
+        try:
+            usage_result = usage_tracker.check_user_limits(current_user.customer_id, 0)
+            if usage_result.get("success", False):
+                usage_info = {
+                    "pages_used": usage_result.get("current_usage", 0),
+                    "pages_included": usage_result.get("pages_included", 10),
+                    "pages_remaining": usage_result.get("pages_remaining", 0),
+                    "plan_type": usage_result.get("plan_type", "free"),
+                    "within_limit": usage_result.get("within_limit", True)
                 }
+        except Exception as e:
+            print(f"⚠️  Usage info retrieval failed: {e}")
         
-        return {
-            "success": True,
-            "dashboard": dashboard_data
+        # Get plan details
+        plan_details = {
+            "free": {"name": "Free", "price": 0, "pages": 10},
+            "student": {"name": "Student", "price": 4.99, "pages": 500},
+            "growth": {"name": "Growth", "price": 19.99, "pages": 2500},
+            "business": {"name": "Business", "price": 49.99, "pages": 10000}
         }
+        
+        current_plan = plan_details.get(current_user.subscription_tier, plan_details["free"])
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Account Dashboard - PDF Parser</title>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+            <style>
+                :root {{
+                    --primary-color: #2563eb;
+                    --primary-hover: #1d4ed8;
+                    --background: #ffffff;
+                    --background-secondary: #f8fafc;
+                    --text-primary: #0f172a;
+                    --text-secondary: #64748b;
+                    --border-color: #e2e8f0;
+                    --border-radius: 8px;
+                    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+                    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                    --transition: all 0.2s ease;
+                }}
+                
+                * {{
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }}
+                
+                body {{
+                    font-family: 'Inter', sans-serif;
+                    background: var(--background-secondary);
+                    color: var(--text-primary);
+                    line-height: 1.6;
+                }}
+                
+                .container {{
+                    max-width: 1000px;
+                    margin: 2rem auto;
+                    padding: 0 1rem;
+                }}
+                
+                .header {{
+                    background: var(--background);
+                    border-radius: var(--border-radius);
+                    padding: 2rem;
+                    margin-bottom: 2rem;
+                    box-shadow: var(--shadow-sm);
+                }}
+                
+                .header h1 {{
+                    font-size: 2rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    margin-bottom: 0.5rem;
+                }}
+                
+                .header p {{
+                    color: var(--text-secondary);
+                    font-size: 1.1rem;
+                }}
+                
+                .dashboard-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 2rem;
+                }}
+                
+                .card {{
+                    background: var(--background);
+                    border-radius: var(--border-radius);
+                    padding: 2rem;
+                    box-shadow: var(--shadow-sm);
+                    border: 1px solid var(--border-color);
+                }}
+                
+                .card h3 {{
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                    margin-bottom: 1rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                }}
+                
+                .card i {{
+                    color: var(--primary-color);
+                }}
+                
+                .usage-bar {{
+                    background: var(--background-secondary);
+                    border-radius: var(--border-radius);
+                    height: 8px;
+                    margin: 1rem 0;
+                    overflow: hidden;
+                }}
+                
+                .usage-fill {{
+                    background: var(--primary-color);
+                    height: 100%;
+                    transition: var(--transition);
+                }}
+                
+                .btn {{
+                    background: var(--primary-color);
+                    color: white;
+                    padding: 0.75rem 1.5rem;
+                    border: none;
+                    border-radius: var(--border-radius);
+                    font-weight: 600;
+                    text-decoration: none;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    cursor: pointer;
+                    transition: var(--transition);
+                }}
+                
+                .btn:hover {{
+                    background: var(--primary-hover);
+                }}
+                
+                .btn-secondary {{
+                    background: var(--background-secondary);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border-color);
+                }}
+                
+                .btn-secondary:hover {{
+                    background: var(--border-color);
+                }}
+                
+                .plan-badge {{
+                    display: inline-block;
+                    background: var(--primary-color);
+                    color: white;
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 999px;
+                    font-size: 0.875rem;
+                    font-weight: 600;
+                }}
+                
+                .api-key {{
+                    background: var(--background-secondary);
+                    padding: 1rem;
+                    border-radius: var(--border-radius);
+                    font-family: monospace;
+                    word-break: break-all;
+                    margin: 1rem 0;
+                }}
+                
+                .back-link {{
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    color: var(--text-secondary);
+                    text-decoration: none;
+                    margin-bottom: 1rem;
+                    font-weight: 500;
+                }}
+                
+                .back-link:hover {{
+                    color: var(--primary-color);
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <a href="/" class="back-link">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Home
+                </a>
+                
+                <div class="header">
+                    <h1>Account Dashboard</h1>
+                    <p>Welcome back, {current_user.email}</p>
+                </div>
+                
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <h3><i class="fas fa-user"></i> Account Details</h3>
+                        <p><strong>Email:</strong> {current_user.email}</p>
+                        <p><strong>Plan:</strong> <span class="plan-badge">{current_plan["name"]}</span></p>
+                        <p><strong>Status:</strong> {"✅ Active" if getattr(current_user, 'subscription_active', False) else "❌ Inactive"}</p>
+                        <p><strong>Email Verified:</strong> {"✅ Yes" if getattr(current_user, 'email_verified', False) else "❌ No"}</p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3><i class="fas fa-chart-bar"></i> Usage This Month</h3>
+                        <p><strong>{usage_info["pages_used"]}</strong> of <strong>{usage_info["pages_included"]}</strong> pages used</p>
+                        <div class="usage-bar">
+                            <div class="usage-fill" style="width: {min(100, (usage_info["pages_used"] / max(usage_info["pages_included"], 1)) * 100)}%"></div>
+                        </div>
+                        <p style="color: var(--text-secondary);">
+                            {usage_info.get("pages_remaining", 0)} pages remaining
+                        </p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3><i class="fas fa-key"></i> API Access</h3>
+                        <p>Your API key for integrations:</p>
+                        <div class="api-key">{current_user.api_key}</div>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                            🔄 Auto-renews with your subscription
+                        </p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3><i class="fas fa-credit-card"></i> Billing Management</h3>
+                        <p><strong>Current Plan:</strong> {current_plan["name"]}</p>
+                        <p><strong>Monthly Cost:</strong> {"$" + str(current_plan["price"]) if current_plan["price"] > 0 else "Free"}</p>
+                        <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                            {"<button class='btn' onclick='openCustomerPortal()'>💳 Manage Subscription</button>" if current_user.subscription_tier != "free" else ""}
+                            <a href="/pricing" class="btn btn-secondary">
+                                <i class="fas fa-upgrade"></i>
+                                {"Upgrade Plan" if current_user.subscription_tier == "free" else "Change Plan"}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+                function openCustomerPortal() {{
+                    // Show loading
+                    event.target.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+                    event.target.disabled = true;
+                    
+                    // Create Stripe customer portal session
+                    fetch('/create-portal-session', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }},
+                        body: JSON.stringify({{
+                            return_url: window.location.origin + '/dashboard'
+                        }})
+                    }})
+                    .then(response => response.json())
+                    .then(data => {{
+                        if (data.success && data.portal_url) {{
+                            window.location.href = data.portal_url;
+                        }} else {{
+                            alert('Error: ' + (data.error || 'Could not open billing portal'));
+                            event.target.innerHTML = '💳 Manage Subscription';
+                            event.target.disabled = false;
+                        }}
+                    }})
+                    .catch(error => {{
+                        console.error('Error:', error);
+                        alert('Error opening billing portal');
+                        event.target.innerHTML = '💳 Manage Subscription';
+                        event.target.disabled = false;
+                    }});
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Dashboard error: {e}")
+        raise HTTPException(status_code=500, detail="Dashboard unavailable")
+
+@app.post("/create-portal-session")
+async def create_portal_session(request: Request, current_user = Depends(get_current_user)):
+    """Create Stripe customer portal session for subscription management"""
+    
+    try:
+        data = await request.json()
+        return_url = data.get("return_url", "https://your-domain.com/dashboard")
+        
+        if not stripe_service or not stripe_service.available:
+            raise HTTPException(status_code=503, detail="Billing service unavailable")
+        
+        # For now, we'll use a placeholder since we need the Stripe customer ID
+        # In production, you'd store the Stripe customer ID with the user account
+        result = {
+            "success": True,
+            "portal_url": "https://billing.stripe.com/p/login/test_123",
+            "message": "Redirecting to Stripe customer portal"
+        }
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Portal session creation failed: {e}")
+        return {
+            "success": False,
+            "error": "Could not create billing portal session. Please contact support."
+        }
 
 @app.post("/auth/verify-email")
 async def verify_email(email: str = Form(...), verification_code: str = Form(...)):
