@@ -1,0 +1,2 @@
+Test PDF content for debugging
+This is a test document to verify PDF upload functionality works correctly.

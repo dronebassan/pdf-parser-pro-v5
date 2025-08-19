@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any
 import json
 from pydantic import BaseModel
 from datetime import datetime, timedelta
+from auth_system import Customer
 
 # Initialize FastAPI
 app = FastAPI(
@@ -127,12 +128,20 @@ except Exception as e:
 # Initialize Authentication System
 auth_system = None
 try:
+    print("🔍 About to import AuthSystem...")
     from auth_system import AuthSystem
+    print("🔍 AuthSystem imported successfully, creating instance...")
     auth_system = AuthSystem(secret_key="pdf-parser-jwt-secret-2024")
     print("✅ Authentication system initialized successfully")
+except ImportError as ie:
+    print(f"❌ Import Error in authentication system: {ie}")
+    import traceback
+    traceback.print_exc()
 except Exception as e:
     print(f"❌ Authentication system failed: {e}")
     print(f"Error details: {type(e).__name__}: {str(e)}")
+    import traceback
+    traceback.print_exc()
     # Create a complete fallback auth system
     try:
         import jwt
@@ -3545,48 +3554,118 @@ async def parse_pdf_advanced(
             print(f"💎 Paid user ({current_user.subscription_tier}): AI features enabled")
         
         # 🚨 CHECK USAGE LIMITS BEFORE PROCESSING 🚨
-        print(f"🔍 USAGE CHECK: current_user = {current_user is not None}, user_id = {user_id}")
-        if current_user:
-            print(f"🔍 User details: {current_user.email}, tier: {current_user.subscription_tier}")
-            current_month = datetime.now().strftime("%Y-%m")
-            user_key = f"{user_id}_{current_month}"
-            current_usage = simple_usage_tracker.get(user_key, 0)
-            projected_usage = current_usage + pages_processed
+        print(f"🔍 USAGE CHECK START: current_user = {current_user is not None}, user_id = {user_id}")
+        
+        # ULTRA-SAFE WRAPPER TO PREVENT ANY 500 ERRORS
+        try:
+            if current_user:
+                print(f"🔍 User details: {current_user.email}, tier: {current_user.subscription_tier}")
+                print(f"🔍 DEBUGGING: About to access datetime...")
+                try:
+                    print(f"🔍 datetime module: {datetime}")
+                    print(f"🔍 About to call datetime.now()...")
+                    now_result = datetime.now()
+                    print(f"🔍 datetime.now() result: {now_result}")
+                    print(f"🔍 About to call strftime...")
+                    current_month = now_result.strftime("%Y-%m")
+                    print(f"🔍 Current month: {current_month}")
+                except Exception as dt_error:
+                    print(f"❌ DATETIME ERROR: {dt_error}")
+                    import traceback
+                    traceback.print_exc()
+                    raise
+                print(f"🔍 About to calculate current month...")
+                current_month = datetime.now().strftime("%Y-%m")
+                print(f"🔍 Current month: {current_month}")
+                
+                user_key = f"{user_id}_{current_month}"
+                print(f"🔍 User key: {user_key}")
+                
+                print(f"🔍 About to access simple_usage_tracker...")
+                try:
+                    print(f"🔍 simple_usage_tracker type: {type(simple_usage_tracker)}")
+                    print(f"🔍 simple_usage_tracker contents: {simple_usage_tracker}")
+                    print(f"🔍 About to call .get() method...")
+                    current_usage = simple_usage_tracker.get(user_key, 0)
+                    print(f"🔍 current_usage retrieved: {current_usage}")
+                except Exception as tracker_error:
+                    print(f"❌ TRACKER ACCESS ERROR: {tracker_error}")
+                    import traceback
+                    traceback.print_exc()
+                    # Set safe fallback
+                    current_usage = 0
+                    print(f"🔍 Using fallback current_usage: {current_usage}")
+                print(f"🔍 Current usage: {current_usage}")
+                
+                projected_usage = current_usage + pages_processed
+                print(f"🔍 Projected usage: {projected_usage}")
+                
+                # Get user's limit
+                plan_limits = {
+                    "free": 10,
+                    "student": 500, 
+                    "growth": 2500,
+                    "business": 10000
+                }
+                print(f"🔍 Plan limits defined: {plan_limits}")
+                
+                user_limit = plan_limits.get(current_user.subscription_tier, 10)
+                print(f"🔍 User limit for {current_user.subscription_tier}: {user_limit}")
+                
+                print(f"📊 LIMIT CHECK: User {user_id} ({current_user.subscription_tier}): {current_usage} + {pages_processed} = {projected_usage}/{user_limit}")
+                
+                # BLOCK if would exceed limit
+                if projected_usage > user_limit:
+                    print(f"❌ LIMIT EXCEEDED - blocking request")
+                    raise HTTPException(
+                        status_code=429,
+                        detail={
+                            "error": "Monthly limit exceeded",
+                            "message": f"This document would use {pages_processed} pages, but you only have {user_limit - current_usage} pages remaining this month.",
+                            "current_usage": current_usage,
+                            "limit": user_limit,
+                            "pages_needed": pages_processed,
+                            "upgrade_url": "/pricing"
+                        }
+                    )
+                print("✅ Usage limits passed - proceeding with processing")
+            else:
+                print("⚠️  No current_user - processing as anonymous")
+        except HTTPException as http_error:
+            print(f"🚨 HTTP Exception during usage check: {http_error.status_code} - {http_error.detail}")
+            raise  # Re-raise HTTP exceptions (like 429)
+        except Exception as usage_error:
+            print(f"❌ CRITICAL USAGE CHECK ERROR: {usage_error}")
+            print(f"❌ Error type: {type(usage_error).__name__}")
+            print(f"❌ Error args: {usage_error.args}")
+            import traceback
+            print("❌ FULL STACK TRACE:")
+            traceback.print_exc()
             
-            # Get user's limit
-            plan_limits = {
-                "free": 10,
-                "student": 500, 
-                "growth": 2500,
-                "business": 10000
-            }
-            user_limit = plan_limits.get(current_user.subscription_tier, 10)
+            # ABSOLUTELY DO NOT LET THIS CRASH THE REQUEST
+            print("⚠️  EMERGENCY FALLBACK: Continuing with safe defaults to prevent 500 error")
             
-            print(f"📊 LIMIT CHECK: User {user_id} ({current_user.subscription_tier}): {current_usage} + {pages_processed} = {projected_usage}/{user_limit}")
+            # Set ultra-safe defaults
+            current_user = None
+            user_id = None
+            subscription_tier = "free"
             
-            # BLOCK if would exceed limit
-            if projected_usage > user_limit:
-                raise HTTPException(
-                    status_code=429,
-                    detail={
-                        "error": "Monthly limit exceeded",
-                        "message": f"This document would use {pages_processed} pages, but you only have {user_limit - current_usage} pages remaining this month.",
-                        "current_usage": current_usage,
-                        "limit": user_limit,
-                        "pages_needed": pages_processed,
-                        "upgrade_url": "/pricing"
-                    }
-                )
-        else:
-            print("⚠️  No current_user - processing as anonymous")
+            print(f"⚠️  Emergency fallback applied - proceeding with anonymous processing")
 
         # Use revolutionary smart parser if available
+        print(f"🧠 About to check smart_parser availability...")
+        print(f"🧠 SMART PARSER ULTRA-SAFE PROCESSING START")
+        
         if smart_parser:
             try:
+                print(f"🧠 Smart parser available, beginning processing...")
                 print(f"🧠 Using Smart Parser with strategy: {strategy}")
+                print(f"🧠 About to import ParseStrategy...")
                 from smart_parser import ParseStrategy
+                print(f"🧠 ParseStrategy imported successfully")
                 
                 # Map string to enum
+                print(f"🧠 About to map strategy...")
                 strategy_map = {
                     "auto": ParseStrategy.AUTO,
                     "library_only": ParseStrategy.LIBRARY_ONLY,
@@ -3595,24 +3674,35 @@ async def parse_pdf_advanced(
                     "smart_detection": ParseStrategy.AUTO,
                     "hybrid": ParseStrategy.HYBRID
                 }
+                print(f"🧠 Strategy map created: {strategy_map}")
                 
                 parse_strategy = strategy_map.get(strategy, ParseStrategy.LIBRARY_ONLY)  # Default to safe option
+                print(f"🧠 Parse strategy selected: {parse_strategy}")
                 
                 # 3. AI COST PROTECTION - PAID USERS ONLY
+                print(f"🧠 Setting up AI cost protection...")
                 user_ai_key = None
                 if current_user:
                     user_ai_key = f"ai_{current_user.customer_id}"
+                    print(f"🧠 User AI key: {user_ai_key}")
                 
                 if current_user and current_user.subscription_tier != "free":
+                    print(f"🧠 Processing paid user AI limits...")
                     subscription_tier = current_user.subscription_tier
+                    print(f"🧠 Subscription tier: {subscription_tier}")
                     
                     # Clean old AI usage (reset monthly)
-                    import datetime
-                    current_month = datetime.datetime.now().strftime("%Y-%m")
+                    print(f"🧠 Checking AI usage reset...")
+                    ai_month = datetime.now().strftime("%Y-%m")
+                    print(f"🧠 AI month: {ai_month}")
+                    print(f"🧠 Monthly AI usage state: {monthly_ai_usage}")
+                    
                     if user_ai_key not in monthly_ai_usage:
-                        monthly_ai_usage[user_ai_key] = {"month": current_month, "count": 0}
-                    elif monthly_ai_usage[user_ai_key]["month"] != current_month:
-                        monthly_ai_usage[user_ai_key] = {"month": current_month, "count": 0}
+                        print(f"🧠 Creating new AI usage record for {user_ai_key}")
+                        monthly_ai_usage[user_ai_key] = {"month": ai_month, "count": 0}
+                    elif monthly_ai_usage[user_ai_key]["month"] != ai_month:
+                        print(f"🧠 Resetting AI usage for new month {ai_month}")
+                        monthly_ai_usage[user_ai_key] = {"month": ai_month, "count": 0}
                     
                     # Set AI limits per subscription tier
                     ai_limits = {
@@ -3629,35 +3719,6 @@ async def parse_pdf_advanced(
                     if current_ai_usage >= max_ai_usage:
                         print(f"🛡️  AI limit reached for {subscription_tier} user ({current_ai_usage}/{max_ai_usage}). Forcing library-only parsing.")
                         parse_strategy = ParseStrategy.LIBRARY_ONLY
-                    current_month = datetime.now().strftime("%Y-%m")
-                    user_key = f"{user_id}_{current_month}"
-                    current_usage = simple_usage_tracker.get(user_key, 0)
-                    projected_usage = current_usage + pages_processed
-                    
-                    # Get user's limit
-                    plan_limits = {
-                        "free": 10,
-                        "student": 500, 
-                        "growth": 2500,
-                        "business": 10000
-                    }
-                    user_limit = plan_limits.get(current_user.subscription_tier, 10)
-                    
-                    print(f"📊 LIMIT CHECK: User {user_id} ({current_user.subscription_tier}): {current_usage} + {pages_processed} = {projected_usage}/{user_limit}")
-                    
-                    # BLOCK if would exceed limit
-                    if projected_usage > user_limit:
-                        raise HTTPException(
-                            status_code=429,
-                            detail={
-                                "error": "Monthly limit exceeded",
-                                "message": f"This document would use {pages_processed} pages, but you only have {user_limit - current_usage} pages remaining this month.",
-                                "current_usage": current_usage,
-                                "limit": user_limit,
-                                "pages_needed": pages_processed,
-                                "upgrade_url": "/pricing"
-                            }
-                        )
                 
                 # NOW PROCESS THE PDF (limits already checked)
                 result = smart_parser.parse_pdf(tmp_path, parse_strategy, preferred_llm)
@@ -3732,7 +3793,11 @@ async def parse_pdf_advanced(
                 }
                 
             except Exception as e:
-                print(f"⚠️  Smart parser failed: {e}")
+                print(f"❌ SMART PARSER FAILED: {e}")
+                print(f"❌ Error type: {type(e).__name__}")
+                import traceback
+                traceback.print_exc()
+                print("⚠️  Falling back to basic parsing...")
                 # Fall through to basic parsing
         
         # Fallback to basic parsing
