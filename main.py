@@ -2759,9 +2759,13 @@ async def register_page(plan: str = "student"):
                             localStorage.setItem('pdf_parser_subscription_tier', data.subscription_tier);
                         }}
                         
-                        // Store login info and redirect to Stripe
+                        // Store login info and redirect appropriately
                         setTimeout(() => {{
-                            window.location.href = '/subscribe/{plan}';
+                            if ('{plan}' === 'free') {{
+                                window.location.href = '/?welcome=true';
+                            }} else {{
+                                window.location.href = '/subscribe/{plan}';
+                            }}
                         }}, 1500);
                     }} else {{
                         throw new Error(data.error || 'Registration failed');
@@ -3078,9 +3082,13 @@ async def login_page(plan: str = "student"):
                             localStorage.setItem('pdf_parser_subscription_tier', data.subscription_tier);
                         }}
                         
-                        // Redirect to subscription route
+                        // Redirect appropriately
                         setTimeout(() => {{
-                            window.location.href = '/subscribe/{plan}';
+                            if ('{plan}' === 'free') {{
+                                window.location.href = '/?welcome=true';
+                            }} else {{
+                                window.location.href = '/subscribe/{plan}';
+                            }}
                         }}, 1500);
                     }} else {{
                         throw new Error(data.detail || 'Login failed');
