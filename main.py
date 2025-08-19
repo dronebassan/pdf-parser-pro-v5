@@ -1679,14 +1679,15 @@ def home():
                     showLoginError('Connection error. Please try again.');
                     console.error('Login error:', error);
                 } finally {
-                    // Reset button after delay if needed
-                    if (submitBtn.innerHTML.includes('Success')) {
-                        setTimeout(() => {
+                    // Always reset button after delay if still loading or showing success
+                    setTimeout(() => {
+                        if (submitBtn.disabled || submitBtn.innerHTML.includes('Success') || submitBtn.innerHTML.includes('Signing')) {
                             submitBtn.innerHTML = '<span class="btn-text"><i class="fas fa-sign-in-alt"></i> Sign In</span>';
                             submitBtn.disabled = false;
                             submitBtn.style.background = '';
-                        }, 2000);
-                    }
+                            submitBtn.classList.remove('btn-loading');
+                        }
+                    }, 3000);
                 }
             }
             
@@ -3154,6 +3155,7 @@ async def login_user(login: UserLogin):
             "success": True,
             "customer_id": customer.customer_id,
             "email": customer.email,
+            "api_key": customer.api_key,
             "subscription_tier": customer.subscription_tier,
             "usage_info": usage_info,
             "message": "Login successful"
