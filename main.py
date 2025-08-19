@@ -2022,8 +2022,8 @@ def pricing_page():
             
             .pricing-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                gap: 2rem;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1.5rem;
                 margin-bottom: 3rem;
             }
             
@@ -2200,7 +2200,14 @@ def pricing_page():
                 }
                 
                 .pricing-grid {
-                    grid-template-columns: 1fr;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 1rem;
+                }
+                
+                @media (max-width: 640px) {
+                    .pricing-grid {
+                        grid-template-columns: 1fr;
+                    }
                 }
             }
         </style>
