@@ -157,11 +157,11 @@ except Exception as e:
             api_key: str
             subscription_tier: str
             created_at: int
-            api_key_expires_at: int = 0
             email_verified: bool = False
             last_ip: str = ""
-            session_expires_at: int = 0
+            last_login: int = 0
             verification_code: str = ""
+            subscription_active: bool = True
         
         class SimpleAuthSystem:
             def __init__(self, secret_key: str):
@@ -186,12 +186,13 @@ except Exception as e:
                                 original_data = customer_data.copy()
                                 
                                 # Add new security fields with sensible defaults
-                                if 'api_key_expires_at' not in customer_data:
-                                    # Existing paid users get 1 year, free users get 30 days
-                                    if customer_data.get('subscription_tier', 'free') != 'free':
-                                        customer_data['api_key_expires_at'] = int(time.time()) + (365 * 24 * 60 * 60)  # 1 year
-                                    else:
-                                        customer_data['api_key_expires_at'] = int(time.time()) + (30 * 24 * 60 * 60)   # 30 days
+                                if 'last_login' not in customer_data:
+                                    customer_data['last_login'] = int(time.time())  # Set to now for existing users
+                                    migrated_count += 1
+                                
+                                if 'subscription_active' not in customer_data:
+                                    # Existing users are active (they already paid/registered)
+                                    customer_data['subscription_active'] = True
                                     migrated_count += 1
                                 
                                 if 'email_verified' not in customer_data:
@@ -202,8 +203,9 @@ except Exception as e:
                                 if 'last_ip' not in customer_data:
                                     customer_data['last_ip'] = ""
                                 
-                                if 'session_expires_at' not in customer_data:
-                                    customer_data['session_expires_at'] = 0
+                                # Remove old expiration fields if they exist
+                                customer_data.pop('api_key_expires_at', None)
+                                customer_data.pop('session_expires_at', None)
                                 
                                 if 'verification_code' not in customer_data:
                                     customer_data['verification_code'] = ""
@@ -236,7 +238,12 @@ except Exception as e:
                             'password_hash': customer.password_hash,
                             'api_key': customer.api_key,
                             'subscription_tier': customer.subscription_tier,
-                            'created_at': customer.created_at
+                            'created_at': customer.created_at,
+                            'email_verified': customer.email_verified,
+                            'last_ip': customer.last_ip,
+                            'last_login': customer.last_login,
+                            'verification_code': customer.verification_code,
+                            'subscription_active': customer.subscription_active
                         }
                     with open(self.db_file, 'w') as f:
                         json.dump(data, f, indent=2)
@@ -245,7 +252,7 @@ except Exception as e:
                     print(f"❌ Could not save customers: {e}")
             
             def generate_api_key(self) -> str:
-                """Generate API key with 30-day expiration"""
+                """Generate API key (never expires - tied to subscription status)"""
                 return f"pdf_parser_{secrets.token_urlsafe(32)}"
             
             def generate_verification_code(self) -> str:
@@ -279,11 +286,11 @@ except Exception as e:
                     api_key=api_key,
                     subscription_tier=subscription_tier,
                     created_at=int(time.time()),
-                    api_key_expires_at=int(time.time()) + (30 * 24 * 60 * 60),  # 30 days
                     email_verified=False,
                     last_ip=ip_address,
-                    session_expires_at=0,
-                    verification_code=verification_code
+                    last_login=int(time.time()),
+                    verification_code=verification_code,
+                    subscription_active=True
                 )
                 
                 self.customers[email] = customer
@@ -303,11 +310,24 @@ except Exception as e:
                 """Get customer by API key with security checks"""
                 for customer in self.customers.values():
                     if customer.api_key == api_key:
-                        # Check if API key expired
-                        if hasattr(customer, 'api_key_expires_at') and customer.api_key_expires_at > 0:
-                            if time.time() > customer.api_key_expires_at:
-                                print(f"🚫 API key expired for {customer.email}")
+                        # Auto-renewal system: Check subscription and activity status
+                        current_time = time.time()
+                        
+                        # Check if subscription is active
+                        if hasattr(customer, 'subscription_active') and not customer.subscription_active:
+                            print(f"🚫 Subscription inactive for {customer.email}")
+                            return None
+                        
+                        # Check for inactivity (6 months = security measure)
+                        if hasattr(customer, 'last_login'):
+                            six_months_ago = current_time - (6 * 30 * 24 * 60 * 60)  # 6 months
+                            if customer.last_login < six_months_ago:
+                                print(f"🚫 Account inactive for 6+ months: {customer.email}")
                                 return None
+                        
+                        # AUTO-RENEWAL: Update last login time (keeps account active)
+                        customer.last_login = int(current_time)
+                        self._save_customers()  # Save updated login time
                         
                         # Check if email verified (required for paid features)
                         if hasattr(customer, 'email_verified') and customer.subscription_tier != SubscriptionTier.FREE:
@@ -338,9 +358,10 @@ except Exception as e:
                     # Only allow upgrades or same tier (no downgrades without verification)
                     if new_index >= current_index or customer.email_verified:
                         customer.subscription_tier = new_tier
-                        # Reset API key expiration for paid upgrades
+                        # Activate subscription for paid upgrades
                         if new_tier != SubscriptionTier.FREE:
-                            customer.api_key_expires_at = int(time.time()) + (365 * 24 * 60 * 60)  # 1 year for paid
+                            customer.subscription_active = True
+                            customer.last_login = int(time.time())  # Reset activity timer
                         self._save_customers()  # Save to disk
                         return True
                     else:
@@ -361,20 +382,26 @@ except Exception as e:
                 print(f"🚫 Invalid verification code for {email}")
                 return False
             
-            def rotate_api_key(self, email: str) -> Optional[str]:
-                """Rotate API key for security"""
+            def deactivate_subscription(self, email: str) -> bool:
+                """Deactivate subscription (cancellation/non-payment)"""
                 customer = self.get_customer_by_email(email)
                 if customer:
-                    old_key = customer.api_key
-                    customer.api_key = self.generate_api_key()
-                    if customer.subscription_tier == SubscriptionTier.FREE:
-                        customer.api_key_expires_at = int(time.time()) + (30 * 24 * 60 * 60)  # 30 days
-                    else:
-                        customer.api_key_expires_at = int(time.time()) + (365 * 24 * 60 * 60)  # 1 year
+                    customer.subscription_active = False
                     self._save_customers()
-                    print(f"🔄 API key rotated for {email}")
-                    return customer.api_key
-                return None
+                    print(f"📴 Subscription deactivated for {email}")
+                    return True
+                return False
+            
+            def reactivate_subscription(self, email: str) -> bool:
+                """Reactivate subscription (payment received)"""
+                customer = self.get_customer_by_email(email)
+                if customer:
+                    customer.subscription_active = True
+                    customer.last_login = int(time.time())  # Reset activity
+                    self._save_customers()
+                    print(f"✅ Subscription reactivated for {email}")
+                    return True
+                return False
         
         auth_system = SimpleAuthSystem(secret_key="pdf-parser-jwt-secret-2024")
     except Exception as fallback_error:
@@ -3505,21 +3532,29 @@ async def verify_email(email: str = Form(...), verification_code: str = Form(...
     else:
         raise HTTPException(status_code=400, detail="Invalid verification code")
 
-@app.post("/auth/rotate-api-key")
-async def rotate_api_key(current_user: Customer = Depends(get_current_user)):
-    """Rotate user's API key for security"""
+@app.post("/auth/subscription/deactivate")
+async def deactivate_subscription(current_user: Customer = Depends(get_current_user)):
+    """Deactivate subscription (admin/webhook use)"""
     if not auth_system:
         raise HTTPException(status_code=503, detail="Authentication service unavailable")
     
-    new_api_key = auth_system.rotate_api_key(current_user.email)
-    if new_api_key:
-        return {
-            "success": True, 
-            "new_api_key": new_api_key,
-            "message": "API key rotated successfully. Please update your applications with the new key."
-        }
+    success = auth_system.deactivate_subscription(current_user.email)
+    if success:
+        return {"success": True, "message": "Subscription deactivated"}
     else:
-        raise HTTPException(status_code=500, detail="Failed to rotate API key")
+        raise HTTPException(status_code=500, detail="Failed to deactivate subscription")
+
+@app.post("/auth/subscription/reactivate")
+async def reactivate_subscription(current_user: Customer = Depends(get_current_user)):
+    """Reactivate subscription (payment received)"""
+    if not auth_system:
+        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+    
+    success = auth_system.reactivate_subscription(current_user.email)
+    if success:
+        return {"success": True, "message": "Subscription reactivated"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to reactivate subscription")
 
 @app.get("/usage/{user_id}")
 async def get_user_usage(user_id: str):
