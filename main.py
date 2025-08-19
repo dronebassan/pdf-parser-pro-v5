@@ -978,6 +978,157 @@ def home():
                 75% { transform: translateX(5px); }
             }
             
+            /* Toast Notification Styles */
+            .toast {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: white;
+                border-radius: 8px;
+                padding: 1rem 1.25rem;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+                border-left: 4px solid var(--primary-color);
+                z-index: 10000;
+                max-width: 400px;
+                transform: translateX(400px);
+                transition: transform 0.3s ease-in-out;
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+            
+            .toast.show {
+                transform: translateX(0);
+            }
+            
+            .toast.error {
+                border-left-color: #dc2626;
+                background: #fef2f2;
+            }
+            
+            .toast.success {
+                border-left-color: #16a34a;
+                background: #f0fdf4;
+            }
+            
+            .toast.warning {
+                border-left-color: #ea580c;
+                background: #fff7ed;
+            }
+            
+            .toast-content {
+                flex: 1;
+            }
+            
+            .toast-title {
+                font-weight: 600;
+                font-size: 0.875rem;
+                margin-bottom: 0.25rem;
+            }
+            
+            .toast-message {
+                font-size: 0.8rem;
+                color: #6b7280;
+                line-height: 1.4;
+            }
+            
+            .toast-close {
+                background: none;
+                border: none;
+                font-size: 1.25rem;
+                cursor: pointer;
+                color: #9ca3af;
+                padding: 0;
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .toast-close:hover {
+                color: #6b7280;
+            }
+            
+            /* Loading states */
+            .btn-loading {
+                opacity: 0.7;
+                cursor: not-allowed;
+                position: relative;
+            }
+            
+            .btn-loading .btn-text {
+                opacity: 0;
+            }
+            
+            .btn-loading::after {
+                content: '';
+                position: absolute;
+                width: 16px;
+                height: 16px;
+                border: 2px solid transparent;
+                border-top: 2px solid currentColor;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+            
+            @keyframes spin {
+                0% { transform: translate(-50%, -50%) rotate(0deg); }
+                100% { transform: translate(-50%, -50%) rotate(360deg); }
+            }
+            
+            /* Upload progress */
+            .upload-progress {
+                margin-top: 1rem;
+                padding: 1rem;
+                background: #f8fafc;
+                border-radius: 8px;
+                border: 1px solid #e2e8f0;
+            }
+            
+            .progress-bar {
+                width: 100%;
+                height: 8px;
+                background: #e2e8f0;
+                border-radius: 4px;
+                overflow: hidden;
+                margin: 0.5rem 0;
+            }
+            
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, var(--primary-color), #60a5fa);
+                border-radius: 4px;
+                transition: width 0.3s ease;
+                position: relative;
+            }
+            
+            .progress-fill::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+                animation: shimmer 2s infinite;
+            }
+            
+            @keyframes shimmer {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(100%); }
+            }
+            
+            .progress-text {
+                font-size: 0.875rem;
+                color: #64748b;
+                text-align: center;
+                margin-top: 0.5rem;
+            }
+            
             .login-btn {
                 width: 100%;
                 background: var(--primary-color);
@@ -993,6 +1144,7 @@ def home():
                 align-items: center;
                 justify-content: center;
                 gap: 0.5rem;
+                position: relative;
             }
             
             .login-btn:hover {
@@ -1047,7 +1199,7 @@ def home():
                 <ul class="nav-links">
                     <li><a href="/">Parse PDF</a></li>
                     <li><a href="/pricing">Pricing</a></li>
-                    <li><a href="/docs">API Docs</a></li>
+                    <li><a href="/docs">Integration Guide</a></li>
                 </ul>
                 
                 <!-- Auth and Usage Section -->
@@ -1157,8 +1309,10 @@ def home():
                             </div>
                             
                             <button type="submit" class="login-btn">
-                                <i class="fas fa-sign-in-alt"></i>
-                                Sign In
+                                <span class="btn-text">
+                                    <i class="fas fa-sign-in-alt"></i>
+                                    Sign In
+                                </span>
                             </button>
                         </form>
                         
@@ -1175,6 +1329,12 @@ def home():
                 <div class="loading">
                     <div class="spinner"></div>
                     <p>Processing your document with AI...</p>
+                    <div class="upload-progress" id="upload-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="progress-text" id="progress-text">Uploading document...</div>
+                    </div>
                 </div>
                 
                 <div class="results">
@@ -1483,27 +1643,43 @@ def home():
                         localStorage.setItem('pdf_parser_email', email);
                         localStorage.setItem('pdf_parser_logged_in', 'true');
                         
-                        // Show success (brief)
-                        submitBtn.innerHTML = '<i class="fas fa-check"></i> Success!';
-                        submitBtn.style.background = 'var(--success-color)';
+                        // Show success
+                        submitBtn.classList.remove('btn-loading');
+                        submitBtn.innerHTML = '<span class="btn-text"><i class="fas fa-check"></i> Success!</span>';
+                        submitBtn.style.background = '#16a34a';
+                        
+                        showToast('Welcome Back!', 'You have been logged in successfully.', 'success');
                         
                         // Transition to logged in state
                         setTimeout(() => {
                             showLoggedInState();
                         }, 1000);
                     } else {
+                        submitBtn.classList.remove('btn-loading');
+                        submitBtn.disabled = false;
+                        
+                        if (result.message && result.message.includes('verification')) {
+                            showToast('Email Verification Required', 'Please check your email and complete verification before logging in.', 'warning');
+                        } else {
+                            showToast('Login Failed', result.message || 'Invalid email or password. Please double-check and try again.', 'error');
+                        }
                         showLoginError(result.message || 'Invalid email or password');
                     }
                 } catch (error) {
+                    submitBtn.classList.remove('btn-loading');
+                    submitBtn.disabled = false;
+                    showToast('Connection Error', 'Unable to connect. Please check your internet connection and try again.', 'error');
                     showLoginError('Connection error. Please try again.');
                     console.error('Login error:', error);
                 } finally {
-                    // Reset button after delay
-                    setTimeout(() => {
-                        submitBtn.innerHTML = originalText;
-                        submitBtn.disabled = false;
-                        submitBtn.style.background = '';
-                    }, 2000);
+                    // Reset button after delay if needed
+                    if (submitBtn.innerHTML.includes('Success')) {
+                        setTimeout(() => {
+                            submitBtn.innerHTML = '<span class="btn-text"><i class="fas fa-sign-in-alt"></i> Sign In</span>';
+                            submitBtn.disabled = false;
+                            submitBtn.style.background = '';
+                        }, 2000);
+                    }
                 }
             }
             
@@ -2451,7 +2627,11 @@ async def register_page(plan: str = "student"):
                     const data = await response.json();
                     
                     if (data.success) {{
-                        messageDiv.innerHTML = '<div class="success">Account created successfully! Redirecting to payment...</div>';
+                        if (data.verification_required) {{
+                            messageDiv.innerHTML = '<div class="success">Account created! Please check your email for a 6-digit verification code, then proceed to payment.</div>';
+                        }} else {{
+                            messageDiv.innerHTML = '<div class="success">Account created successfully! Redirecting to payment...</div>';
+                        }}
                         
                         // Store user info in localStorage for session management
                         if (data.customer_id) {{
