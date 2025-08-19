@@ -3594,6 +3594,39 @@ async def parse_pdf_advanced(
                         print(f"🛡️  AI limit reached for {subscription_tier} user ({current_ai_usage}/{max_ai_usage}). Forcing library-only parsing.")
                         parse_strategy = ParseStrategy.LIBRARY_ONLY
                         
+                # 🚨 CHECK USAGE LIMITS BEFORE PROCESSING 🚨
+                if current_user:
+                    current_month = datetime.now().strftime("%Y-%m")
+                    user_key = f"{user_id}_{current_month}"
+                    current_usage = simple_usage_tracker.get(user_key, 0)
+                    projected_usage = current_usage + pages_processed
+                    
+                    # Get user's limit
+                    plan_limits = {
+                        "free": 10,
+                        "student": 500, 
+                        "growth": 2500,
+                        "business": 10000
+                    }
+                    user_limit = plan_limits.get(current_user.subscription_tier, 10)
+                    
+                    print(f"📊 LIMIT CHECK: User {user_id} ({current_user.subscription_tier}): {current_usage} + {pages_processed} = {projected_usage}/{user_limit}")
+                    
+                    # BLOCK if would exceed limit
+                    if projected_usage > user_limit:
+                        raise HTTPException(
+                            status_code=429,
+                            detail={
+                                "error": "Monthly limit exceeded",
+                                "message": f"This document would use {pages_processed} pages, but you only have {user_limit - current_usage} pages remaining this month.",
+                                "current_usage": current_usage,
+                                "limit": user_limit,
+                                "pages_needed": pages_processed,
+                                "upgrade_url": "/pricing"
+                            }
+                        )
+                
+                # NOW PROCESS THE PDF (limits already checked)
                 result = smart_parser.parse_pdf(tmp_path, parse_strategy, preferred_llm)
                 
                 # Check if AI was used
@@ -3615,45 +3648,12 @@ async def parse_pdf_advanced(
                         except Exception as e:
                             print(f"💰 AI cost tracking failed: {e}")
                 
-                # 🚨 BULLETPROOF USAGE TRACKING 🚨
+                # 🚨 TRACK USAGE AFTER SUCCESSFUL PROCESSING 🚨
                 if current_user:
-                    # SIMPLE TRACKING THAT ACTUALLY WORKS
                     current_month = datetime.now().strftime("%Y-%m")
                     user_key = f"{user_id}_{current_month}"
-                    
-                    # Update usage counter
                     simple_usage_tracker[user_key] = simple_usage_tracker.get(user_key, 0) + pages_processed
-                    total_pages_used = simple_usage_tracker[user_key]
-                    
-                    print(f"📊 SIMPLE TRACKING: User {user_id} has used {total_pages_used} pages this month")
-                    
-                    # ENFORCE LIMITS BASED ON SUBSCRIPTION
-                    if current_user.subscription_tier == "free":
-                        if total_pages_used > 10:
-                            raise HTTPException(
-                                status_code=429,
-                                detail=f"Free tier limit exceeded: {total_pages_used}/10 pages used this month. Upgrade to continue."
-                            )
-                    elif current_user.subscription_tier == "student":
-                        if total_pages_used > 500:
-                            raise HTTPException(
-                                status_code=429,
-                                detail=f"Student tier limit exceeded: {total_pages_used}/500 pages used this month."
-                            )
-                    elif current_user.subscription_tier == "growth":
-                        if total_pages_used > 2500:
-                            raise HTTPException(
-                                status_code=429,
-                                detail=f"Growth tier limit exceeded: {total_pages_used}/2500 pages used this month."
-                            )
-                    elif current_user.subscription_tier == "business":
-                        if total_pages_used > 10000:
-                            raise HTTPException(
-                                status_code=429,
-                                detail=f"Business tier limit exceeded: {total_pages_used}/10000 pages used this month."
-                            )
-                    
-                    print(f"✅ USAGE TRACKED: {pages_processed} pages added. Total: {total_pages_used}")
+                    print(f"✅ USAGE TRACKED: {pages_processed} pages added. Total: {simple_usage_tracker[user_key]}")
                     
                 else:
                     print(f"Anonymous user: {pages_processed} pages processed")
