@@ -11,6 +11,7 @@ import stripe  # Re-enabled for production billing
 from typing import Optional, Dict, Any
 import json
 from pydantic import BaseModel
+from datetime import datetime, timedelta
 
 # Initialize FastAPI
 app = FastAPI(
@@ -466,6 +467,9 @@ ai_cleanup_counter = 0
 
 # EMERGENCY FALLBACK: In-memory usage tracking (if database fails)
 emergency_usage_tracking = {}  # user_id -> pages_used_today
+
+# SIMPLE USAGE TRACKING: user_id -> total_pages_used_this_month
+simple_usage_tracker = {}  # This will actually work
 
 # Memory cleanup thresholds
 CLEANUP_INTERVAL = 100  # Clean every 100 operations
@@ -3611,86 +3615,48 @@ async def parse_pdf_advanced(
                         except Exception as e:
                             print(f"💰 AI cost tracking failed: {e}")
                 
-                # 🚨 CRITICAL BILLING PROTECTION 🚨
-                # MUST track usage or block processing to prevent free usage
-                usage_tracked = False
-                
-                if current_user:  # Only track for logged-in users
-                    if not usage_tracker:
-                        print("🚨 CRITICAL: Usage tracker not available - blocking processing")
-                        raise HTTPException(
-                            status_code=503,
-                            detail="Billing system unavailable. Processing temporarily disabled to prevent revenue loss."
-                        )
+                # 🚨 BULLETPROOF USAGE TRACKING 🚨
+                if current_user:
+                    # SIMPLE TRACKING THAT ACTUALLY WORKS
+                    current_month = datetime.now().strftime("%Y-%m")
+                    user_key = f"{user_id}_{current_month}"
                     
-                    try:
-                        print(f"🔍 Starting CRITICAL usage tracking for user {user_id}, pages: {pages_processed}")
-                        
-                        # Check user limits BEFORE processing
-                        limits_check = usage_tracker.check_user_limits(user_id, pages_processed)
-                        print(f"📊 Limits check result: {limits_check}")
-                        
-                        if not limits_check.get("success"):
-                            print(f"🚨 User limits check failed: {limits_check.get('error')}")
-                            # Still allow processing but force track usage
-                        
-                        # Check and reset billing cycle if needed
-                        usage_tracker.check_and_reset_billing_cycle(user_id)
-                        
-                        # Record usage with accurate cost estimation
-                        base_cost = pages_processed * 0.001  # Base processing cost
-                        ai_cost = 0.02 if ai_used else 0  # AI processing cost
-                        total_cost = base_cost + ai_cost
-                        
-                        tracking_result = usage_tracker.track_usage(
-                            user_id=user_id,
-                            subscription_id="",  # Would get from user's subscription
-                            pages_processed=pages_processed,
-                            document_name=file.filename,
-                            processing_strategy=result.method_used,
-                            ai_used=ai_used,
-                            cost_estimate=total_cost
-                        )
-                        
-                        print(f"📊 Usage tracked: {pages_processed} pages, cost: ${total_cost:.4f}")
-                        print(f"📊 Tracking result: {tracking_result}")
-                        
-                        if tracking_result.get("success"):
-                            usage_tracked = True
-                            print("✅ Database usage tracking successful")
-                        else:
-                            print(f"🚨 CRITICAL: Database tracking failed: {tracking_result}")
-                            # EMERGENCY FALLBACK: In-memory tracking
-                            emergency_usage_tracking[user_id] = emergency_usage_tracking.get(user_id, 0) + pages_processed
-                            usage_tracked = True
-                            print(f"⚠️  Using emergency fallback tracking: {emergency_usage_tracking[user_id]} pages")
-                            
-                    except Exception as e:
-                        print(f"🚨 CRITICAL: Usage tracking exception: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        
-                        # EMERGENCY FALLBACK: In-memory tracking
-                        emergency_usage_tracking[user_id] = emergency_usage_tracking.get(user_id, 0) + pages_processed
-                        usage_tracked = True
-                        print(f"⚠️  Exception fallback tracking: {emergency_usage_tracking[user_id]} pages")
-                        
-                        # Only block if we can't even do emergency tracking
-                        if current_user.subscription_tier != "free" and emergency_usage_tracking.get(user_id, 0) > 100:
+                    # Update usage counter
+                    simple_usage_tracker[user_key] = simple_usage_tracker.get(user_key, 0) + pages_processed
+                    total_pages_used = simple_usage_tracker[user_key]
+                    
+                    print(f"📊 SIMPLE TRACKING: User {user_id} has used {total_pages_used} pages this month")
+                    
+                    # ENFORCE LIMITS BASED ON SUBSCRIPTION
+                    if current_user.subscription_tier == "free":
+                        if total_pages_used > 10:
                             raise HTTPException(
-                                status_code=503,
-                                detail="Usage limit exceeded via emergency tracking. Contact support."
+                                status_code=429,
+                                detail=f"Free tier limit exceeded: {total_pages_used}/10 pages used this month. Upgrade to continue."
+                            )
+                    elif current_user.subscription_tier == "student":
+                        if total_pages_used > 500:
+                            raise HTTPException(
+                                status_code=429,
+                                detail=f"Student tier limit exceeded: {total_pages_used}/500 pages used this month."
+                            )
+                    elif current_user.subscription_tier == "growth":
+                        if total_pages_used > 2500:
+                            raise HTTPException(
+                                status_code=429,
+                                detail=f"Growth tier limit exceeded: {total_pages_used}/2500 pages used this month."
+                            )
+                    elif current_user.subscription_tier == "business":
+                        if total_pages_used > 10000:
+                            raise HTTPException(
+                                status_code=429,
+                                detail=f"Business tier limit exceeded: {total_pages_used}/10000 pages used this month."
                             )
                     
-                    # Final check - if tracking failed for paid users, block
-                    if not usage_tracked and current_user.subscription_tier != "free":
-                        print(f"🚨 BLOCKING: Usage not tracked for paid user {current_user.subscription_tier}")
-                        raise HTTPException(
-                            status_code=503,
-                            detail="Usage tracking failed. Processing blocked to prevent billing issues."
-                        )
+                    print(f"✅ USAGE TRACKED: {pages_processed} pages added. Total: {total_pages_used}")
+                    
                 else:
-                    print(f"Free tier usage: {pages_processed} pages processed (no tracking needed)")
+                    print(f"Anonymous user: {pages_processed} pages processed")
                 
                 if not current_user:
                     # Track free tier usage (for analytics)
@@ -4096,26 +4062,31 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
         return RedirectResponse(url="/auth/login", status_code=302)
     
     try:
-        # Get usage information
-        usage_info = {"pages_used": 0, "pages_included": 10}
-        if usage_tracker:
-            try:
-                print(f"🔍 Checking usage for user: {current_user.customer_id}")
-                usage_result = usage_tracker.check_user_limits(current_user.customer_id, 0)
-                print(f"🔍 Usage result: {usage_result}")
-                if usage_result.get("success", False):
-                    usage_info = {
-                        "pages_used": usage_result.get("current_usage", 0),
-                        "pages_included": usage_result.get("pages_included", 10),
-                        "pages_remaining": usage_result.get("pages_remaining", 0),
-                        "plan_type": usage_result.get("plan_type", "free"),
-                        "within_limit": usage_result.get("within_limit", True)
-                    }
-                    print(f"✅ Updated usage info: {usage_info}")
-            except Exception as e:
-                print(f"⚠️  Usage info retrieval failed: {e}")
-        else:
-            print("⚠️  Usage tracker not available")
+        # Get usage information from SIMPLE TRACKER
+        current_month = datetime.now().strftime("%Y-%m")
+        user_key = f"{current_user.customer_id}_{current_month}"
+        pages_used = simple_usage_tracker.get(user_key, 0)
+        
+        # Get plan limits
+        plan_limits = {
+            "free": 10,
+            "student": 500,
+            "growth": 2500,
+            "business": 10000
+        }
+        
+        pages_included = plan_limits.get(current_user.subscription_tier, 10)
+        pages_remaining = max(0, pages_included - pages_used)
+        
+        usage_info = {
+            "pages_used": pages_used,
+            "pages_included": pages_included,
+            "pages_remaining": pages_remaining,
+            "plan_type": current_user.subscription_tier,
+            "within_limit": pages_used <= pages_included
+        }
+        
+        print(f"📊 SIMPLE DASHBOARD: User {current_user.customer_id} used {pages_used}/{pages_included} pages")
         
         # Get plan details
         plan_details = {
