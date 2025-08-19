@@ -3611,6 +3611,7 @@ async def parse_pdf_advanced(
                 # Track usage and update billing cycle
                 if user_id and usage_tracker:
                     try:
+                        print(f"🔍 Starting usage tracking for user {user_id}, pages: {pages_processed}")
                         # Check and reset billing cycle if needed
                         usage_tracker.check_and_reset_billing_cycle(user_id)
                         
@@ -3619,7 +3620,7 @@ async def parse_pdf_advanced(
                         ai_cost = 0.02 if ai_used else 0  # AI processing cost
                         total_cost = base_cost + ai_cost
                         
-                        usage_tracker.track_usage(
+                        tracking_result = usage_tracker.track_usage(
                             user_id=user_id,
                             subscription_id="",  # Would get from user's subscription
                             pages_processed=pages_processed,
@@ -3630,8 +3631,13 @@ async def parse_pdf_advanced(
                         )
                         
                         print(f"📊 Usage tracked: {pages_processed} pages, cost: ${total_cost:.4f}")
+                        print(f"📊 Tracking result: {tracking_result}")
                     except Exception as e:
-                        print(f"Usage tracking failed: {e}")
+                        print(f"❌ Usage tracking failed: {e}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print(f"⚠️  Usage tracking skipped - user_id: {user_id}, usage_tracker: {usage_tracker is not None}")
                 elif not current_user:
                     # Track free tier usage (for analytics)
                     print(f"Free tier usage: {pages_processed} pages processed")
@@ -4038,18 +4044,24 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
     try:
         # Get usage information
         usage_info = {"pages_used": 0, "pages_included": 10}
-        try:
-            usage_result = usage_tracker.check_user_limits(current_user.customer_id, 0)
-            if usage_result.get("success", False):
-                usage_info = {
-                    "pages_used": usage_result.get("current_usage", 0),
-                    "pages_included": usage_result.get("pages_included", 10),
-                    "pages_remaining": usage_result.get("pages_remaining", 0),
-                    "plan_type": usage_result.get("plan_type", "free"),
-                    "within_limit": usage_result.get("within_limit", True)
-                }
-        except Exception as e:
-            print(f"⚠️  Usage info retrieval failed: {e}")
+        if usage_tracker:
+            try:
+                print(f"🔍 Checking usage for user: {current_user.customer_id}")
+                usage_result = usage_tracker.check_user_limits(current_user.customer_id, 0)
+                print(f"🔍 Usage result: {usage_result}")
+                if usage_result.get("success", False):
+                    usage_info = {
+                        "pages_used": usage_result.get("current_usage", 0),
+                        "pages_included": usage_result.get("pages_included", 10),
+                        "pages_remaining": usage_result.get("pages_remaining", 0),
+                        "plan_type": usage_result.get("plan_type", "free"),
+                        "within_limit": usage_result.get("within_limit", True)
+                    }
+                    print(f"✅ Updated usage info: {usage_info}")
+            except Exception as e:
+                print(f"⚠️  Usage info retrieval failed: {e}")
+        else:
+            print("⚠️  Usage tracker not available")
         
         # Get plan details
         plan_details = {
