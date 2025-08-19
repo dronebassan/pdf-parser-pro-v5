@@ -3308,6 +3308,7 @@ async def env_debug():
 
 @app.post("/parse/")
 async def parse_pdf_advanced(
+    request: Request,
     file: UploadFile = File(...),
     strategy: str = "auto",
     preferred_llm: str = "gemini",
@@ -3555,9 +3556,12 @@ async def parse_pdf_advanced(
                 parse_strategy = strategy_map.get(strategy, ParseStrategy.LIBRARY_ONLY)  # Default to safe option
                 
                 # 3. AI COST PROTECTION - PAID USERS ONLY
+                user_ai_key = None
+                if current_user:
+                    user_ai_key = f"ai_{current_user.customer_id}"
+                
                 if current_user and current_user.subscription_tier != "free":
                     subscription_tier = current_user.subscription_tier
-                    user_ai_key = f"ai_{current_user.customer_id}"
                     
                     # Clean old AI usage (reset monthly)
                     import datetime
@@ -3589,7 +3593,7 @@ async def parse_pdf_advanced(
                 ai_used = result.fallback_triggered or "ai" in result.method_used.lower() or "llm" in result.method_used.lower()
                 
                 # Track AI usage for cost protection and billing
-                if ai_used and current_user:
+                if ai_used and current_user and user_ai_key:
                     if user_ai_key in monthly_ai_usage:
                         monthly_ai_usage[user_ai_key]["count"] += 1
                         print(f"💰 AI usage tracked: {monthly_ai_usage[user_ai_key]['count']} for {current_user.subscription_tier} user")
