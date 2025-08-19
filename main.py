@@ -387,7 +387,7 @@ def home():
                 z-index: 1000;
                 background: var(--background);
                 border-bottom: 1px solid var(--border-color);
-                padding: 1rem 0;
+                padding: 1.5rem 0;
                 box-shadow: var(--shadow-sm);
             }
             
@@ -398,10 +398,11 @@ def home():
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                min-height: 60px;
             }
             
             .logo {
-                font-size: 1.5rem;
+                font-size: 1.75rem;
                 font-weight: 700;
                 color: var(--text-primary);
                 text-decoration: none;
@@ -411,13 +412,13 @@ def home():
             }
             
             .logo i {
-                font-size: 1.5rem;
+                font-size: 1.75rem;
                 color: var(--primary-color);
             }
             
             .nav-links {
                 display: flex;
-                gap: 2rem;
+                gap: 2.5rem;
                 list-style: none;
                 align-items: center;
             }
@@ -426,6 +427,7 @@ def home():
                 color: var(--text-secondary);
                 text-decoration: none;
                 font-weight: 500;
+                font-size: 1.05rem;
                 padding: 0.5rem 1rem;
                 border-radius: var(--border-radius);
                 transition: var(--transition);
@@ -750,7 +752,7 @@ def home():
             }
             
             .login-header h3 {
-                font-size: 1.5rem;
+                font-size: 1.75rem;
                 font-weight: 600;
                 color: var(--text-primary);
                 margin-bottom: 0.5rem;
@@ -1581,7 +1583,7 @@ def pricing_page():
                 z-index: 1000;
                 background: var(--background);
                 border-bottom: 1px solid var(--border-color);
-                padding: 1rem 0;
+                padding: 1.5rem 0;
                 box-shadow: var(--shadow-sm);
             }
             
@@ -1592,10 +1594,11 @@ def pricing_page():
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                min-height: 60px;
             }
             
             .logo {
-                font-size: 1.5rem;
+                font-size: 1.75rem;
                 font-weight: 700;
                 color: var(--text-primary);
                 text-decoration: none;
@@ -1605,13 +1608,13 @@ def pricing_page():
             }
             
             .logo i {
-                font-size: 1.5rem;
+                font-size: 1.75rem;
                 color: var(--primary-color);
             }
             
             .nav-links {
                 display: flex;
-                gap: 2rem;
+                gap: 2.5rem;
                 list-style: none;
                 align-items: center;
             }
@@ -1620,6 +1623,7 @@ def pricing_page():
                 color: var(--text-secondary);
                 text-decoration: none;
                 font-weight: 500;
+                font-size: 1.05rem;
                 padding: 0.5rem 1rem;
                 border-radius: var(--border-radius);
                 transition: var(--transition);
@@ -1731,7 +1735,7 @@ def pricing_page():
             }
             
             .plan-price .currency {
-                font-size: 1.5rem;
+                font-size: 1.75rem;
                 vertical-align: top;
             }
             
