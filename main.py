@@ -2898,6 +2898,10 @@ async def register_page(plan: str = "student"):
                             localStorage.setItem('pdf_parser_customer_id', data.customer_id);
                             localStorage.setItem('pdf_parser_email', data.email);
                             localStorage.setItem('pdf_parser_subscription_tier', data.subscription_tier);
+                            localStorage.setItem('pdf_parser_logged_in', 'true');
+                            if (data.api_key) {{
+                                localStorage.setItem('pdf_parser_api_key', data.api_key);
+                            }}
                         }}
                         
                         // Store login info and redirect appropriately
@@ -2995,6 +2999,7 @@ async def register_user(registration: UserRegistration, request: Request):
             "success": True,
             "customer_id": customer.customer_id,
             "email": customer.email,
+            "api_key": customer.api_key,
             "subscription_tier": customer.subscription_tier,
             "verification_required": subscription_tier != "free",
             "verification_code": customer.verification_code if hasattr(customer, 'verification_code') else None,
@@ -3221,6 +3226,10 @@ async def login_page(plan: str = "student"):
                             localStorage.setItem('pdf_parser_customer_id', data.customer_id);
                             localStorage.setItem('pdf_parser_email', data.email);
                             localStorage.setItem('pdf_parser_subscription_tier', data.subscription_tier);
+                            localStorage.setItem('pdf_parser_logged_in', 'true');
+                            if (data.api_key) {{
+                                localStorage.setItem('pdf_parser_api_key', data.api_key);
+                            }}
                         }}
                         
                         // Redirect appropriately
