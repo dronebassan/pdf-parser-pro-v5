@@ -4881,6 +4881,10 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                         <h3><i class="fas fa-credit-card"></i> Billing Management</h3>
                         <p><strong>Current Plan:</strong> {current_plan["name"]}</p>
                         <p><strong>Monthly Cost:</strong> {"$" + str(current_plan["price"]) if current_plan["price"] > 0 else "Free"}</p>
+                        
+                        <!-- Message area for clean feedback -->
+                        <div id="billing-message" style="display: none; padding: 1rem; border-radius: 8px; margin: 1rem 0; font-weight: 500;"></div>
+                        
                         <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
                             {"<button class='btn-secondary btn' onclick='cancelSubscription()' style='color: #dc2626; border-color: #dc2626;'>❌ Cancel Subscription</button>" if current_user.subscription_tier != "free" else ""}
                             <a href="/pricing" class="btn btn-secondary">
@@ -4931,14 +4935,67 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                     }});
                 }}
                 
-                function cancelSubscription() {{
-                    if (!confirm('Are you sure you want to cancel your subscription? This will immediately downgrade your account to the free plan (15 uploads/hour, 10 pages/month).')) {{
-                        return;
-                    }}
+                function showMessage(text, type = 'info') {{
+                    const messageDiv = document.getElementById('billing-message');
+                    messageDiv.textContent = text;
+                    messageDiv.style.display = 'block';
                     
-                    const button = event.target;
+                    // Style based on type
+                    if (type === 'success') {{
+                        messageDiv.style.backgroundColor = '#dcfce7';
+                        messageDiv.style.color = '#166534';
+                        messageDiv.style.border = '1px solid #bbf7d0';
+                    }} else if (type === 'error') {{
+                        messageDiv.style.backgroundColor = '#fef2f2';
+                        messageDiv.style.color = '#dc2626';
+                        messageDiv.style.border = '1px solid #fecaca';
+                    }} else if (type === 'warning') {{
+                        messageDiv.style.backgroundColor = '#fffbeb';
+                        messageDiv.style.color = '#d97706';
+                        messageDiv.style.border = '1px solid #fed7aa';
+                    }} else {{
+                        messageDiv.style.backgroundColor = '#eff6ff';
+                        messageDiv.style.color = '#2563eb';
+                        messageDiv.style.border = '1px solid #dbeafe';
+                    }}
+                }}
+                
+                function showCancellationConfirmation() {{
+                    const messageDiv = document.getElementById('billing-message');
+                    messageDiv.innerHTML = `
+                        <div style="text-align: center;">
+                            <p style="margin-bottom: 1rem; font-weight: 600;">⚠️ Cancel Subscription?</p>
+                            <p style="margin-bottom: 1.5rem; font-size: 0.9rem;">This will immediately downgrade your account to the free plan (15 uploads/hour, 10 pages/month).</p>
+                            <div style="display: flex; gap: 1rem; justify-content: center;">
+                                <button onclick="proceedWithCancellation()" style="background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">
+                                    Yes, Cancel Subscription
+                                </button>
+                                <button onclick="hideCancellationConfirmation()" style="background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">
+                                    Keep Subscription
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.backgroundColor = '#fffbeb';
+                    messageDiv.style.color = '#d97706';
+                    messageDiv.style.border = '1px solid #fed7aa';
+                }}
+                
+                function hideCancellationConfirmation() {{
+                    document.getElementById('billing-message').style.display = 'none';
+                }}
+                
+                function cancelSubscription() {{
+                    showCancellationConfirmation();
+                }}
+                
+                function proceedWithCancellation() {{
+                    const button = document.querySelector('[onclick="cancelSubscription()"]');
                     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Canceling...';
                     button.disabled = true;
+                    
+                    showMessage('Canceling subscription...', 'info');
                     
                     fetch('/cancel-subscription', {{
                         method: 'POST',
@@ -4955,17 +5012,17 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                     .then(data => {{
                         console.log('Cancellation response:', data);
                         if (data.success) {{
-                            alert(data.message || 'Subscription canceled successfully. You are now on the free plan.');
-                            location.reload();
+                            showMessage(data.message || 'Subscription canceled successfully. You are now on the free plan.', 'success');
+                            setTimeout(() => location.reload(), 2000); // Give user time to read the message
                         }} else {{
-                            alert('Error canceling subscription: ' + (data.error || 'Unknown error'));
+                            showMessage('Error canceling subscription: ' + (data.error || 'Unknown error'), 'error');
                             button.innerHTML = '❌ Cancel Subscription';
                             button.disabled = false;
                         }}
                     }})
                     .catch(error => {{
                         console.error('Cancellation error:', error);
-                        alert('Error canceling subscription: ' + error.message + '. Please try again or contact support.');
+                        showMessage('Error canceling subscription: ' + error.message + '. Please try again or contact support.', 'error');
                         button.innerHTML = '❌ Cancel Subscription';
                         button.disabled = false;
                     }});
