@@ -264,7 +264,12 @@ class StripeService:
     def cancel_subscription(self, customer_email: str) -> Dict[str, Any]:
         """BULLETPROOF: Cancel ALL subscriptions for a customer by email with comprehensive search"""
         
+        print(f"🔍 CANCEL DEBUG: Entering cancel_subscription for {customer_email}")
+        print(f"🔍 CANCEL DEBUG: stripe module = {stripe}")
+        print(f"🔍 CANCEL DEBUG: self.available = {self.available}")
+        
         if not stripe:
+            print("❌ CANCEL DEBUG: Stripe module not available")
             return {
                 "success": False,
                 "error": "Stripe not available"
