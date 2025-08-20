@@ -1981,6 +1981,23 @@ def home():
             
             uploadArea.addEventListener('drop', handleDrop, false);
             
+            // Initialize login state on page load
+            function initializeLoginState() {
+                const isLoggedIn = localStorage.getItem('pdf_parser_logged_in');
+                const apiKey = localStorage.getItem('pdf_parser_api_key');
+                
+                if (isLoggedIn && apiKey) {
+                    // User is logged in - hide login section
+                    document.getElementById('login-section').style.display = 'none';
+                } else {
+                    // User not logged in - show login section
+                    document.getElementById('login-section').style.display = 'block';
+                }
+            }
+            
+            // Initialize on page load
+            initializeLoginState();
+            
             function handleDrop(e) {
                 // Check authentication first (same as handleFileSelect)
                 const isLoggedIn = localStorage.getItem('pdf_parser_logged_in');
