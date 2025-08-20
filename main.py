@@ -1351,8 +1351,8 @@ def home():
                     <div class="upload-icon">
                         <i class="fas fa-cloud-upload-alt"></i>
                     </div>
-                    <h3>Upload Your PDF - FREE</h3>
-                    <p>Try up to 3 uploads per hour • Create free account for 15 uploads per hour + AI features</p>
+                    <h3>Upload Your PDF</h3>
+                    <p>Sign in to get started with 15 uploads per hour + AI features</p>
                     <input type="file" id="fileInput" style="display: none;" accept=".pdf" onchange="handleFileSelect(event)">
                 </div>
                 
@@ -1448,8 +1448,24 @@ def home():
                 }
             });
             
-            // File upload handling
+            // File upload handling - requires authentication
             function handleFileSelect(event) {
+                // Check if user is logged in first
+                const token = localStorage.getItem('pdf_parser_token');
+                if (!token) {
+                    // Show login section if not logged in
+                    document.getElementById('login-section').style.display = 'block';
+                    document.querySelector('.upload-area h3').textContent = 'Please sign in to upload files';
+                    document.querySelector('.upload-area h3').style.color = '#ef4444';
+                    setTimeout(() => {
+                        document.querySelector('.upload-area h3').textContent = 'Upload Your PDF';
+                        document.querySelector('.upload-area h3').style.color = '';
+                    }, 3000);
+                    // Clear the file input
+                    event.target.value = '';
+                    return;
+                }
+                
                 const file = event.target.files[0];
                 if (file && file.type === 'application/pdf') {
                     uploadFile(file);
@@ -1457,7 +1473,7 @@ def home():
                     document.querySelector('.upload-area h3').textContent = 'Please select a valid PDF file';
                     document.querySelector('.upload-area h3').style.color = '#ef4444';
                     setTimeout(() => {
-                        document.querySelector('.upload-area h3').textContent = 'Upload Your PDF - FREE';
+                        document.querySelector('.upload-area h3').textContent = 'Upload Your PDF';
                         document.querySelector('.upload-area h3').style.color = '';
                     }, 3000);
                 }
@@ -2410,7 +2426,7 @@ def pricing_page():
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem;">No credit card required</div>
                     <div class="plan-description">Try our basic PDF processing</div>
                     <ul class="plan-features">
-                        <li><i class="fas fa-check"></i> 3 uploads per hour (anonymous) or 15 uploads per hour + 10 pages/month (account)</li>
+                        <li><i class="fas fa-check"></i> 15 uploads per hour + 10 pages/month</li>
                         <li><i class="fas fa-check"></i> Library-based parsing</li>
                         <li><i class="fas fa-check"></i> OCR for scanned PDFs</li>
                         <li><i class="fas fa-times" style="color: var(--text-muted);"></i> <span style="color: var(--text-muted);">AI processing (upgrade required)</span></li>
@@ -2484,7 +2500,7 @@ def pricing_page():
                 <div class="faq-grid">
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">How do I get started?</div>
-                        <div class="faq-answer">Try 3 uploads per hour without account, or create free account for 15 uploads per hour + 10 pages/month tracked usage. For AI features and higher limits, choose a paid plan. Email verification required for paid subscriptions.</div>
+                        <div class="faq-answer">Create a free account for 15 uploads per hour + 10 pages/month tracked usage. For AI features and higher limits, choose a paid plan. Email verification required for paid subscriptions.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Why are there upload limits per hour?</div>
@@ -2496,7 +2512,7 @@ def pricing_page():
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">What's the difference between free and paid plans?</div>
-                        <div class="faq-answer">Anonymous users: 3 uploads per hour basic processing. Free accounts: 15 uploads per hour + 10 pages/month tracked. Paid plans: AI-powered processing with Google Gemini 2.5 Flash for complex layouts, tables, and superior accuracy.</div>
+                        <div class="faq-answer">Free accounts: 15 uploads per hour + 10 pages/month tracked. Paid plans: AI-powered processing with Google Gemini 2.5 Flash for complex layouts, tables, and superior accuracy.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Do I need to manage API keys manually?</div>
@@ -2512,7 +2528,7 @@ def pricing_page():
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">What are the upload limits?</div>
-                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free accounts (15 uploads per hour), Student (40 uploads per hour), Growth (120 uploads per hour), Business (300 uploads per hour). Anonymous users: 3 uploads per hour.</div>
+                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free accounts (15 uploads per hour), Student (40 uploads per hour), Growth (120 uploads per hour), Business (300 uploads per hour).</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Can I cancel anytime?</div>
@@ -3342,7 +3358,7 @@ async def parse_pdf_advanced(
     file: UploadFile = File(...),
     strategy: str = "auto",
     preferred_llm: str = "gemini",
-    current_user = Depends(get_current_user_optional)
+    current_user = Depends(get_current_user)
 ):
     """Revolutionary PDF parsing with 3-step fallback system and 99% cost optimization"""
     
@@ -3378,32 +3394,27 @@ async def parse_pdf_advanced(
             detail="Too many uploads from this location. This prevents abuse. Please try again later or contact support."
         )
     
-    # Different limits for different user types
-    if current_user:
-        user_key = f"user_{current_user.customer_id}"
-        subscription_tier = current_user.subscription_tier
-        
-        # Check if email verified for paid plans
-        if hasattr(current_user, 'email_verified') and subscription_tier != "free":
-            if not current_user.email_verified:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Email verification required for paid features. Please check your email for verification code."
-                )
-        
-        # Tiered limits that encourage upgrades while staying profitable
-        if subscription_tier == "student":
-            max_uploads_per_hour = 40    # $4.99 plan - good for personal use
-        elif subscription_tier == "growth": 
-            max_uploads_per_hour = 120   # $19.99 plan - good for small business
-        elif subscription_tier == "business":
-            max_uploads_per_hour = 300   # $49.99 plan - enterprise level
-        else:
-            max_uploads_per_hour = 15    # Free accounts with login - taste of premium
+    # User-based rate limiting (authentication required)
+    user_key = f"user_{current_user.customer_id}"
+    subscription_tier = current_user.subscription_tier
+    
+    # Check if email verified for paid plans
+    if hasattr(current_user, 'email_verified') and subscription_tier != "free":
+        if not current_user.email_verified:
+            raise HTTPException(
+                status_code=403,
+                detail="Email verification required for paid features. Please check your email for verification code."
+            )
+    
+    # Tiered limits that encourage upgrades while staying profitable
+    if subscription_tier == "student":
+        max_uploads_per_hour = 40    # $4.99 plan - good for personal use
+    elif subscription_tier == "growth": 
+        max_uploads_per_hour = 120   # $19.99 plan - good for small business
+    elif subscription_tier == "business":
+        max_uploads_per_hour = 300   # $49.99 plan - enterprise level
     else:
-        # Anonymous users: strict limits to encourage signup
-        user_key = f"anon_{client_ip}"
-        max_uploads_per_hour = 3     # Very limited - must create account
+        max_uploads_per_hour = 15    # Free accounts with login - taste of premium
     
     # Clean old entries (older than 1 hour)
     if user_key in user_upload_history:
@@ -3419,10 +3430,7 @@ async def parse_pdf_advanced(
         time_until_reset = 3600 - (current_time - user_upload_history[user_key][0])
         minutes_left = int(time_until_reset / 60)
         
-        if current_user:
-            detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Try again in {minutes_left} minutes, or upgrade for higher limits."
-        else:
-            detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Create a free account for higher limits, or try again in {minutes_left} minutes."
+        detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Try again in {minutes_left} minutes, or upgrade for higher limits."
             
         raise HTTPException(status_code=429, detail=detail)
     
@@ -3645,8 +3653,8 @@ async def parse_pdf_advanced(
                         }
                     )
                 print("✅ Usage limits passed - proceeding with processing")
-            else:
-                print("⚠️  No current_user - processing as anonymous")
+            # Authentication is now required - this shouldn't happen
+            print("✅ User authenticated successfully")
         except HTTPException as http_error:
             print(f"🚨 HTTP Exception during usage check: {http_error.status_code} - {http_error.detail}")
             raise  # Re-raise HTTP exceptions (like 429)
@@ -3658,15 +3666,12 @@ async def parse_pdf_advanced(
             print("❌ FULL STACK TRACE:")
             traceback.print_exc()
             
-            # ABSOLUTELY DO NOT LET THIS CRASH THE REQUEST
-            print("⚠️  EMERGENCY FALLBACK: Continuing with safe defaults to prevent 500 error")
-            
-            # Set ultra-safe defaults
-            current_user = None
-            user_id = None
-            subscription_tier = "free"
-            
-            print(f"⚠️  Emergency fallback applied - proceeding with anonymous processing")
+            # Since authentication is required, this is a critical error
+            print("🚨 CRITICAL: Usage check failed for authenticated user")
+            raise HTTPException(
+                status_code=500, 
+                detail="Service temporarily unavailable. Please try again in a moment."
+            )
 
         # Use revolutionary smart parser if available
         print(f"🧠 About to check smart_parser availability...")
