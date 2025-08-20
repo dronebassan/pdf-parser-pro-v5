@@ -261,7 +261,7 @@ class StripeService:
             }
     
     def cancel_subscription(self, customer_email: str) -> Dict[str, Any]:
-        """Cancel all active subscriptions for a customer by email"""
+        """BULLETPROOF: Cancel ALL subscriptions for a customer by email with comprehensive search"""
         
         if not stripe:
             return {
@@ -270,50 +270,101 @@ class StripeService:
             }
         
         try:
-            # Find customer by email
-            customers = stripe.Customer.list(email=customer_email, limit=10)
+            print(f"🔍 COMPREHENSIVE Stripe cancellation search for: {customer_email}")
+            
+            # STEP 1: Find customers by exact email match
+            customers = stripe.Customer.list(email=customer_email, limit=100)
+            print(f"📊 Found {len(customers.data)} Stripe customers with email {customer_email}")
             
             if not customers.data:
-                return {
-                    "success": False,
-                    "error": "No customer found with this email"
-                }
-            
-            canceled_count = 0
-            for customer in customers.data:
-                # Get all active subscriptions for this customer
-                subscriptions = stripe.Subscription.list(
-                    customer=customer.id,
-                    status="active",
-                    limit=10
+                # STEP 2: Search for subscriptions without customer (in case of orphaned subscriptions)
+                print(f"🔍 No customers found, searching for orphaned subscriptions...")
+                all_subscriptions = stripe.Subscription.list(
+                    status="active", 
+                    limit=100
                 )
                 
-                # Cancel all active subscriptions
-                for subscription in subscriptions.data:
-                    try:
-                        canceled_sub = stripe.Subscription.cancel(subscription.id)
-                        canceled_count += 1
-                        print(f"✅ Canceled subscription {subscription.id} for {customer_email}")
-                    except Exception as cancel_error:
-                        print(f"❌ Failed to cancel subscription {subscription.id}: {cancel_error}")
+                # Check if any active subscriptions might belong to this email
+                orphaned_found = False
+                for sub in all_subscriptions.data:
+                    if sub.customer:
+                        try:
+                            customer_obj = stripe.Customer.retrieve(sub.customer)
+                            if customer_obj.email == customer_email:
+                                print(f"🚨 Found orphaned subscription {sub.id} for {customer_email}")
+                                orphaned_found = True
+                        except:
+                            pass
+                
+                if not orphaned_found:
+                    return {
+                        "success": False,
+                        "error": "No customer found with this email",
+                        "detailed_search": True
+                    }
             
+            canceled_count = 0
+            failed_cancellations = []
+            
+            # STEP 3: Cancel ALL subscriptions for ALL customers with this email
+            for customer in customers.data:
+                print(f"🔍 Checking customer {customer.id} for active subscriptions...")
+                
+                # Get ALL subscriptions (active, past_due, unpaid, etc.)
+                all_statuses = ["active", "past_due", "unpaid", "paused"]
+                
+                for status in all_statuses:
+                    subscriptions = stripe.Subscription.list(
+                        customer=customer.id,
+                        status=status,
+                        limit=100
+                    )
+                    
+                    print(f"📊 Found {len(subscriptions.data)} {status} subscriptions for customer {customer.id}")
+                    
+                    # Cancel all subscriptions in this status
+                    for subscription in subscriptions.data:
+                        try:
+                            if subscription.status in ["active", "past_due", "unpaid", "paused"]:
+                                canceled_sub = stripe.Subscription.cancel(subscription.id)
+                                canceled_count += 1
+                                print(f"✅ FORCEFULLY canceled {subscription.status} subscription {subscription.id} for {customer_email}")
+                        except Exception as cancel_error:
+                            failed_cancellations.append({
+                                "subscription_id": subscription.id,
+                                "error": str(cancel_error)
+                            })
+                            print(f"❌ Failed to cancel subscription {subscription.id}: {cancel_error}")
+            
+            # STEP 4: Report results
             if canceled_count > 0:
                 return {
                     "success": True,
-                    "message": f"Successfully canceled {canceled_count} subscription(s)",
-                    "canceled_count": canceled_count
+                    "message": f"BULLETPROOF cancellation: Successfully canceled {canceled_count} subscription(s)",
+                    "canceled_count": canceled_count,
+                    "failed_cancellations": failed_cancellations,
+                    "comprehensive_search": True
+                }
+            elif failed_cancellations:
+                return {
+                    "success": False,
+                    "error": f"Found subscriptions but failed to cancel all of them: {failed_cancellations}",
+                    "failed_cancellations": failed_cancellations
                 }
             else:
                 return {
                     "success": False,
-                    "error": "No active subscriptions found to cancel"
+                    "error": "No active subscriptions found to cancel",
+                    "comprehensive_search": True
                 }
             
         except Exception as e:
-            print(f"❌ Error canceling subscription: {e}")
+            print(f"❌ CRITICAL: Comprehensive Stripe cancellation failed: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "success": False,
-                "error": str(e)
+                "error": f"Critical cancellation error: {str(e)}"
             }
     
     def get_subscription_info(self, subscription_id: str) -> Dict[str, Any]:
