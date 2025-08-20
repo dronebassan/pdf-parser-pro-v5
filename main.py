@@ -4967,11 +4967,11 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                             <p style="margin-bottom: 1rem; font-weight: 600;">⚠️ Cancel Subscription?</p>
                             <p style="margin-bottom: 1.5rem; font-size: 0.9rem;">This will immediately downgrade your account to the free plan (15 uploads/hour, 10 pages/month).</p>
                             <div style="display: flex; gap: 1rem; justify-content: center;">
-                                <button onclick="proceedWithCancellation()" style="background: #dc2626; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">
-                                    Yes, Cancel Subscription
+                                <button onclick="proceedWithCancellation()" style="background: #dc2626; color: white; border: none; padding: 0.5rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                    OK - Cancel Subscription
                                 </button>
-                                <button onclick="hideCancellationConfirmation()" style="background: #6b7280; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">
-                                    Keep Subscription
+                                <button onclick="hideCancellationConfirmation()" style="background: #6b7280; color: white; border: none; padding: 0.5rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                                    Cancel
                                 </button>
                             </div>
                         </div>
