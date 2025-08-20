@@ -457,8 +457,8 @@ async def get_current_user(request: Request, credentials: HTTPAuthorizationCrede
         # Get client IP for security validation
         client_ip = request.client.host
         
-        # Get customer by API key with IP validation
-        customer = auth_system.get_customer_by_api_key(credentials.credentials, client_ip)
+        # Get customer by API key
+        customer = auth_system.get_customer_by_api_key(credentials.credentials)
         if not customer:
             raise HTTPException(status_code=401, detail="Invalid or expired API key")
         return customer
@@ -1451,8 +1451,9 @@ def home():
             // File upload handling - requires authentication
             function handleFileSelect(event) {
                 // Check if user is logged in first
-                const token = localStorage.getItem('pdf_parser_token');
-                if (!token) {
+                const isLoggedIn = localStorage.getItem('pdf_parser_logged_in');
+                const apiKey = localStorage.getItem('pdf_parser_api_key');
+                if (!isLoggedIn || !apiKey) {
                     // Show login section if not logged in
                     document.getElementById('login-section').style.display = 'block';
                     document.querySelector('.upload-area h3').textContent = 'Please sign in to upload files';
@@ -3453,12 +3454,9 @@ async def parse_pdf_advanced(
     
     # 4. CONTINUE WITH PROCESSING - Rate limit already enforced above
     
-    # Determine user info and limits
-    user_id = None
-    subscription_tier = "free"
-    if current_user:
-        user_id = current_user.customer_id
-        subscription_tier = current_user.subscription_tier
+    # Determine user info and limits (authentication required)
+    user_id = current_user.customer_id
+    subscription_tier = current_user.subscription_tier
     
     try:
         # Save uploaded file
@@ -3546,30 +3544,15 @@ async def parse_pdf_advanced(
                         status_code=429,
                         detail=f"Monthly limit exceeded. Upgrade to continue processing or wait for next billing cycle."
                     )
-        elif not current_user:
-            # Unauthenticated user - free tier with generous limits to drive conversions
-            if pages_processed > 10:  # Free tier: max 10 pages per request
-                raise HTTPException(
-                    status_code=401,
-                    detail={
-                        "error": "Free tier limited to 10 pages per document",
-                        "message": "Want more pages + AI processing? Upgrade to Student plan for just $4.99/month!",
-                        "upgrade_url": "/pricing",
-                        "register_url": "/auth/register",
-                        "pages_processed": pages_processed,
-                        "pages_limit": 10
-                    }
-                )
-            # Give free users FULL AI features to showcase quality
-            # This creates the "wow factor" that drives conversions
+        # Authentication is required - this case should not occur
         
         result = None
         
         # Run memory cleanup to prevent memory attacks
         cleanup_memory()
         
-        # PAID-ONLY AI STRATEGY: Protect costs by restricting AI to paying customers
-        if not current_user or current_user.subscription_tier == "free":
+        # AI STRATEGY: Free users get library-only, paid users get AI features
+        if current_user.subscription_tier == "free":
             # FREE USERS: Library-only parsing (no AI costs)
             strategy = "library_only"
             print(f"🆓 Free tier: Using library-only parsing (no AI costs)")
@@ -3582,9 +3565,8 @@ async def parse_pdf_advanced(
         
         # ULTRA-SAFE WRAPPER TO PREVENT ANY 500 ERRORS
         try:
-            if current_user:
-                print(f"🔍 User details: {current_user.email}, tier: {current_user.subscription_tier}")
-                print(f"🔍 DEBUGGING: About to access datetime...")
+            print(f"🔍 User details: {current_user.email}, tier: {current_user.subscription_tier}")
+            print(f"🔍 DEBUGGING: About to access datetime...")
                 try:
                     print(f"🔍 datetime module: {datetime}")
                     print(f"🔍 About to call datetime.now()...")
@@ -3702,10 +3684,8 @@ async def parse_pdf_advanced(
                 
                 # 3. AI COST PROTECTION - PAID USERS ONLY
                 print(f"🧠 Setting up AI cost protection...")
-                user_ai_key = None
-                if current_user:
-                    user_ai_key = f"ai_{current_user.customer_id}"
-                    print(f"🧠 User AI key: {user_ai_key}")
+                user_ai_key = f"ai_{current_user.customer_id}"
+                print(f"🧠 User AI key: {user_ai_key}")
                 
                 if current_user and current_user.subscription_tier != "free":
                     print(f"🧠 Processing paid user AI limits...")
@@ -3764,18 +3744,10 @@ async def parse_pdf_advanced(
                             print(f"💰 AI cost tracking failed: {e}")
                 
                 # 🚨 TRACK USAGE AFTER SUCCESSFUL PROCESSING 🚨
-                if current_user:
-                    current_month = datetime.now().strftime("%Y-%m")
-                    user_key = f"{user_id}_{current_month}"
-                    simple_usage_tracker[user_key] = simple_usage_tracker.get(user_key, 0) + pages_processed
-                    print(f"✅ USAGE TRACKED: {pages_processed} pages added. Total: {simple_usage_tracker[user_key]}")
-                    
-                else:
-                    print(f"Anonymous user: {pages_processed} pages processed")
-                
-                if not current_user:
-                    # Track free tier usage (for analytics)
-                    print(f"Free tier usage: {pages_processed} pages processed")
+                current_month = datetime.now().strftime("%Y-%m")
+                user_key = f"{user_id}_{current_month}"
+                simple_usage_tracker[user_key] = simple_usage_tracker.get(user_key, 0) + pages_processed
+                print(f"✅ USAGE TRACKED: {pages_processed} pages added. Total: {simple_usage_tracker[user_key]}")
                 
                 # Convert SmartParseResult to API response
                 processing_time = time.time() - start_time
