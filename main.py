@@ -959,9 +959,12 @@ def home():
             /* Enhanced Login Section */
             .login-container {
                 margin-top: 3rem;
-                display: flex;
-                justify-content: center;
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
                 padding: 0 1rem;
+                width: 100% !important;
+                position: relative !important;
             }
             
             .login-card {
@@ -973,6 +976,8 @@ def home():
                 width: 100%;
                 box-shadow: var(--shadow-lg);
                 transition: var(--transition);
+                margin: 0 auto !important;
+                position: relative !important;
             }
             
             .login-card:hover {
@@ -1827,7 +1832,12 @@ def home():
                 localStorage.removeItem('pdf_parser_customer_id');
                 
                 // Update UI to logged out state
-                document.getElementById('login-section').style.display = 'block';
+                const loginSection = document.getElementById('login-section');
+                loginSection.style.display = 'block';
+                loginSection.style.justifyContent = 'center';
+                loginSection.style.alignItems = 'center';
+                loginSection.style.width = '100%';
+                loginSection.style.position = 'relative';
                 document.getElementById('account-section').style.display = 'none';
                 
                 // Hide usage tracker and show get started button
