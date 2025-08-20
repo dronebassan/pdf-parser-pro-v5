@@ -4997,10 +4997,20 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                     
                     showMessage('Canceling subscription...', 'info');
                     
+                    // Get API key for authentication
+                    const apiKey = localStorage.getItem('pdf_parser_api_key');
+                    if (!apiKey) {{
+                        showMessage('Error: Not authenticated. Please refresh and log in again.', 'error');
+                        button.innerHTML = '❌ Cancel Subscription';
+                        button.disabled = false;
+                        return;
+                    }}
+                    
                     fetch('/cancel-subscription', {{
                         method: 'POST',
                         headers: {{
                             'Content-Type': 'application/json',
+                            'X-API-Key': apiKey
                         }}
                     }})
                     .then(response => {{
