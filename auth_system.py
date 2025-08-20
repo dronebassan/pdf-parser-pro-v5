@@ -107,11 +107,15 @@ class AuthSystem:
         customer = self.authenticate_api_key(api_key)
         if customer:
             customer.subscription_tier = new_tier
-            # Update in API key manager
-            config = api_key_manager.get_customer_config(customer.customer_id)
-            if config:
-                config.subscription_tier = new_tier
-                api_key_manager.save_customer_config(config)
+            # Update in API key manager (if available)
+            if api_key_manager:
+                try:
+                    config = api_key_manager.get_customer_config(customer.customer_id)
+                    if config:
+                        config.subscription_tier = new_tier
+                        api_key_manager.save_customer_config(config)
+                except Exception as e:
+                    print(f"⚠️ API key manager update failed (continuing anyway): {e}")
             return True
         return False
 
