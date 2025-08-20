@@ -5014,9 +5014,9 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                     
                     showMessage('Canceling subscription...', 'info');
                     
-                    // Get API key for authentication
-                    const apiKey = localStorage.getItem('pdf_parser_api_key');
-                    if (!apiKey) {{
+                    // Use session-based authentication (same as dashboard)
+                    const isLoggedIn = localStorage.getItem('pdf_parser_logged_in');
+                    if (!isLoggedIn) {{
                         showMessage('Error: Not authenticated. Please refresh and log in again.', 'error');
                         button.innerHTML = '❌ Cancel Subscription';
                         button.disabled = false;
@@ -5026,9 +5026,9 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                     fetch('/cancel-subscription', {{
                         method: 'POST',
                         headers: {{
-                            'Content-Type': 'application/json',
-                            'X-API-Key': apiKey
-                        }}
+                            'Content-Type': 'application/json'
+                        }},
+                        credentials: 'include'  // Include session cookies
                     }})
                     .then(response => {{
                         if (!response.ok) {{
@@ -5093,7 +5093,7 @@ async def create_portal_session(request: Request, current_user = Depends(get_cur
         }
 
 @app.post("/cancel-subscription")
-async def cancel_subscription(current_user = Depends(get_current_user_optional)):
+async def cancel_subscription(request: Request, current_user = Depends(get_current_user_optional)):
     """Cancel user's subscription and downgrade to free tier"""
     
     
