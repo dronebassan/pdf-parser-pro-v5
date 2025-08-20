@@ -267,12 +267,27 @@ class StripeService:
         print(f"🔍 CANCEL DEBUG: Entering cancel_subscription for {customer_email}")
         print(f"🔍 CANCEL DEBUG: stripe module = {stripe}")
         print(f"🔍 CANCEL DEBUG: self.available = {self.available}")
+        print(f"🔍 CANCEL DEBUG: stripe.api_key set = {'Yes' if hasattr(stripe, 'api_key') and stripe.api_key else 'No'}")
+        if hasattr(stripe, 'api_key') and stripe.api_key:
+            print(f"🔍 CANCEL DEBUG: stripe.api_key preview = {stripe.api_key[:12]}...")
         
         if not stripe:
             print("❌ CANCEL DEBUG: Stripe module not available")
             return {
                 "success": False,
                 "error": "Stripe not available"
+            }
+            
+        # Test Stripe API key before proceeding
+        try:
+            print("🔍 CANCEL DEBUG: Testing Stripe API key...")
+            test_customers = stripe.Customer.list(limit=1)
+            print("✅ CANCEL DEBUG: Stripe API key test passed")
+        except Exception as api_test_error:
+            print(f"❌ CANCEL DEBUG: Stripe API key test failed: {api_test_error}")
+            return {
+                "success": False,
+                "error": f"Stripe API key invalid: {str(api_test_error)}"
             }
         
         try:
