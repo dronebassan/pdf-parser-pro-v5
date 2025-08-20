@@ -264,21 +264,14 @@ class StripeService:
     def cancel_subscription(self, customer_email: str) -> Dict[str, Any]:
         """BULLETPROOF: Cancel ALL subscriptions for a customer by email with comprehensive search"""
         
-        print(f"🔍 CANCEL DEBUG: Entering cancel_subscription for {customer_email}")
-        print(f"🔍 CANCEL DEBUG: stripe module = {stripe}")
-        print(f"🔍 CANCEL DEBUG: self.available = {self.available}")
-        print(f"🔍 CANCEL DEBUG: stripe.api_key set = {'Yes' if hasattr(stripe, 'api_key') and stripe.api_key else 'No'}")
-        if hasattr(stripe, 'api_key') and stripe.api_key:
-            print(f"🔍 CANCEL DEBUG: stripe.api_key preview = {stripe.api_key[:12]}...")
         
         if not stripe:
-            print("❌ CANCEL DEBUG: Stripe module not available")
             return {
                 "success": False,
                 "error": "Stripe not available"
             }
             
-        # FORCE re-set API key to handle Railway threading issues
+        # Ensure API key is set (fix for Railway threading issues)
         import os
         stripe_api_key = (
             os.getenv("STRIPE_SECRET_KEY") or
@@ -287,27 +280,8 @@ class StripeService:
             os.getenv("SK_SECRET_KEY")
         )
         
-        if not stripe_api_key:
-            print("❌ CANCEL DEBUG: No Stripe API key found in environment")
-            return {
-                "success": False,
-                "error": "Stripe API key not configured"
-            }
-            
-        print(f"🔍 CANCEL DEBUG: Force-setting API key: {stripe_api_key[:12]}...")
-        stripe.api_key = stripe_api_key.strip()
-        
-        # Test Stripe API key before proceeding
-        try:
-            print("🔍 CANCEL DEBUG: Testing Stripe API key...")
-            test_customers = stripe.Customer.list(limit=1)
-            print("✅ CANCEL DEBUG: Stripe API key test passed")
-        except Exception as api_test_error:
-            print(f"❌ CANCEL DEBUG: Stripe API key test failed: {api_test_error}")
-            return {
-                "success": False,
-                "error": f"Stripe API key invalid: {str(api_test_error)}"
-            }
+        if stripe_api_key:
+            stripe.api_key = stripe_api_key.strip()
         
         try:
             print(f"🔍 COMPREHENSIVE Stripe cancellation search for: {customer_email}")

@@ -5109,9 +5109,6 @@ async def cancel_subscription(request: Request, current_user = Depends(get_curre
         # ENHANCED CANCELLATION: Try multiple approaches to ensure success
         stripe_result = {"success": False, "error": "Stripe not available"}
         
-        # DEBUG: Check stripe service status
-        print(f"🔍 STRIPE DEBUG: stripe_service = {stripe_service}")
-        print(f"🔍 STRIPE DEBUG: stripe_service.available = {stripe_service.available if stripe_service else 'N/A'}")
         
         # 1. Attempt Stripe cancellation (but don't fail if this doesn't work)
         if stripe_service and stripe_service.available:
