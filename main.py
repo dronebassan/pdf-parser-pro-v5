@@ -2513,7 +2513,7 @@ def pricing_page():
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">What are the upload limits?</div>
-                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free accounts (15 uploads per hour), Student (40 uploads per hour), Growth (120 uploads per hour), Business (300 uploads per hour). Anonymous users: 5 uploads per hour.</div>
+                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free accounts (15 uploads per hour), Student (40 uploads per hour), Growth (120 uploads per hour), Business (300 uploads per hour). Anonymous users: 3 uploads per hour.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Can I cancel anytime?</div>
@@ -3350,24 +3350,11 @@ async def parse_pdf_advanced(
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
-    # Read file content first
-    content = await file.read()
-    
     start_time = time.time()
     pages_processed = 0
     ai_used = False
     
-    # 1. FILE SIZE PROTECTION - Prevent server overload
-    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB limit
-    content_size = len(content)
-    if content_size > MAX_FILE_SIZE:
-        size_mb = content_size / (1024 * 1024)
-        raise HTTPException(
-            status_code=413, 
-            detail=f"File too large ({size_mb:.1f}MB). Maximum size is 50MB. Please split large documents or use a smaller file."
-        )
-    
-    # 2. RATE LIMITING PROTECTION - Prevent spam and server overload
+    # 1. RATE LIMITING PROTECTION - Check BEFORE processing anything
     import time as time_module
     current_time = time_module.time()
     
@@ -3415,9 +3402,9 @@ async def parse_pdf_advanced(
         else:
             max_uploads_per_hour = 15    # Free accounts with login - taste of premium
     else:
-        # Anonymous users: reasonable limits to allow testing while encouraging signup  
+        # Anonymous users: strict limits to encourage signup
         user_key = f"anon_{client_ip}"
-        max_uploads_per_hour = 5     # Allows proper testing - encourages account creation
+        max_uploads_per_hour = 3     # Very limited - must create account
     
     # Clean old entries (older than 1 hour)
     if user_key in user_upload_history:
@@ -3436,13 +3423,28 @@ async def parse_pdf_advanced(
         if current_user:
             detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Try again in {minutes_left} minutes, or upgrade for higher limits."
         else:
-            detail = f"Anonymous limit reached: {max_uploads_per_hour} uploads per hour. ✨ Create a FREE account to get 15 uploads/hour immediately! Or try again in {minutes_left} minutes."
+            detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Create a free account for higher limits, or try again in {minutes_left} minutes."
             
         raise HTTPException(status_code=429, detail=detail)
     
     # Record this upload for both user and IP tracking
     user_upload_history[user_key].append(current_time)
     user_upload_history[ip_key].append(current_time)
+    
+    # 2. NOW read and validate file content (after rate limiting passed)
+    content = await file.read()
+    
+    # 3. FILE SIZE PROTECTION - Prevent server overload
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB limit
+    content_size = len(content)
+    if content_size > MAX_FILE_SIZE:
+        size_mb = content_size / (1024 * 1024)
+        raise HTTPException(
+            status_code=413, 
+            detail=f"File too large ({size_mb:.1f}MB). Maximum size is 50MB. Please split large documents or use a smaller file."
+        )
+    
+    # 4. CONTINUE WITH PROCESSING - Rate limit already enforced above
     
     # Determine user info and limits
     user_id = None
