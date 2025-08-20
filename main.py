@@ -4015,6 +4015,38 @@ async def customer_portal(customer_id: str, return_url: str = "https://your-doma
     
     return result
 
+@app.post("/admin/upgrade-user")
+async def manual_upgrade_user(email: str, tier: str, admin_key: str = "emergency_upgrade_2025"):
+    """Emergency manual user upgrade endpoint"""
+    if admin_key != "emergency_upgrade_2025":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    try:
+        tier_map = {
+            "student": SubscriptionTier.STUDENT,
+            "growth": SubscriptionTier.GROWTH, 
+            "business": SubscriptionTier.BUSINESS,
+            "free": SubscriptionTier.FREE
+        }
+        new_tier = tier_map.get(tier.lower())
+        if not new_tier:
+            raise HTTPException(status_code=400, detail="Invalid tier")
+        
+        if auth_system.upgrade_customer(email, new_tier):
+            # Reset usage counter for new billing cycle
+            customer = auth_system.get_customer_by_email(email)
+            if customer:
+                current_month = datetime.now().strftime("%Y-%m")
+                user_key = f"{customer.customer_id}_{current_month}"
+                simple_usage_tracker[user_key] = 0  # Reset usage for new plan
+                print(f"🔄 Manual upgrade: Usage reset for {email} - {tier} tier activated")
+            
+            return {"success": True, "message": f"User {email} upgraded to {tier} tier", "usage_reset": True}
+        else:
+            raise HTTPException(status_code=404, detail="User not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upgrade failed: {str(e)}")
+
 @app.post("/stripe-webhook/")
 async def stripe_webhook(request: Request):
     """Handle Stripe webhooks with full billing automation"""
@@ -4048,14 +4080,22 @@ async def stripe_webhook(request: Request):
                 if auth_system and hasattr(auth_system, 'upgrade_customer'):
                     try:
                         tier_map = {
-                            "student": "student",
-                            "growth": "growth", 
-                            "business": "business"
+                            "student": SubscriptionTier.STUDENT,
+                            "growth": SubscriptionTier.GROWTH, 
+                            "business": SubscriptionTier.BUSINESS
                         }
-                        new_tier = tier_map.get(plan.lower(), "student")
+                        new_tier = tier_map.get(plan.lower(), SubscriptionTier.STUDENT)
                         
                         if auth_system.upgrade_customer(customer_email, new_tier):
                             print(f"🎯 Successfully upgraded {customer_email} to {new_tier} tier")
+                            
+                            # Reset usage counter for new billing cycle
+                            customer = auth_system.get_customer_by_email(customer_email)
+                            if customer:
+                                current_month = datetime.now().strftime("%Y-%m")
+                                user_key = f"{customer.customer_id}_{current_month}"
+                                simple_usage_tracker[user_key] = 0  # Reset usage for new plan
+                                print(f"🔄 Usage reset for {customer_email} - new billing cycle started")
                             
                             # Setup billing cycle in usage tracker
                             if usage_tracker:
