@@ -3567,74 +3567,74 @@ async def parse_pdf_advanced(
         try:
             print(f"🔍 User details: {current_user.email}, tier: {current_user.subscription_tier}")
             print(f"🔍 DEBUGGING: About to access datetime...")
-                try:
-                    print(f"🔍 datetime module: {datetime}")
-                    print(f"🔍 About to call datetime.now()...")
-                    now_result = datetime.now()
-                    print(f"🔍 datetime.now() result: {now_result}")
-                    print(f"🔍 About to call strftime...")
-                    current_month = now_result.strftime("%Y-%m")
-                    print(f"🔍 Current month: {current_month}")
-                except Exception as dt_error:
-                    print(f"❌ DATETIME ERROR: {dt_error}")
-                    import traceback
-                    traceback.print_exc()
-                    raise
-                print(f"🔍 About to calculate current month...")
-                current_month = datetime.now().strftime("%Y-%m")
+            try:
+                print(f"🔍 datetime module: {datetime}")
+                print(f"🔍 About to call datetime.now()...")
+                now_result = datetime.now()
+                print(f"🔍 datetime.now() result: {now_result}")
+                print(f"🔍 About to call strftime...")
+                current_month = now_result.strftime("%Y-%m")
                 print(f"🔍 Current month: {current_month}")
-                
-                user_key = f"{user_id}_{current_month}"
-                print(f"🔍 User key: {user_key}")
-                
-                print(f"🔍 About to access simple_usage_tracker...")
-                try:
-                    print(f"🔍 simple_usage_tracker type: {type(simple_usage_tracker)}")
-                    print(f"🔍 simple_usage_tracker contents: {simple_usage_tracker}")
-                    print(f"🔍 About to call .get() method...")
-                    current_usage = simple_usage_tracker.get(user_key, 0)
-                    print(f"🔍 current_usage retrieved: {current_usage}")
-                except Exception as tracker_error:
-                    print(f"❌ TRACKER ACCESS ERROR: {tracker_error}")
-                    import traceback
-                    traceback.print_exc()
-                    # Set safe fallback
-                    current_usage = 0
-                    print(f"🔍 Using fallback current_usage: {current_usage}")
-                print(f"🔍 Current usage: {current_usage}")
-                
-                projected_usage = current_usage + pages_processed
-                print(f"🔍 Projected usage: {projected_usage}")
-                
-                # Get user's limit
-                plan_limits = {
-                    "free": 10,
-                    "student": 500, 
-                    "growth": 2500,
-                    "business": 10000
-                }
-                print(f"🔍 Plan limits defined: {plan_limits}")
-                
-                user_limit = plan_limits.get(current_user.subscription_tier, 10)
-                print(f"🔍 User limit for {current_user.subscription_tier}: {user_limit}")
-                
-                print(f"📊 LIMIT CHECK: User {user_id} ({current_user.subscription_tier}): {current_usage} + {pages_processed} = {projected_usage}/{user_limit}")
-                
-                # BLOCK if would exceed limit
-                if projected_usage > user_limit:
-                    print(f"❌ LIMIT EXCEEDED - blocking request")
-                    raise HTTPException(
-                        status_code=429,
-                        detail={
-                            "error": "Monthly limit exceeded",
-                            "message": f"This document would use {pages_processed} pages, but you only have {user_limit - current_usage} pages remaining this month.",
-                            "current_usage": current_usage,
-                            "limit": user_limit,
-                            "pages_needed": pages_processed,
-                            "upgrade_url": "/pricing"
-                        }
-                    )
-                print("✅ Usage limits passed - proceeding with processing")
+            except Exception as dt_error:
+                print(f"❌ DATETIME ERROR: {dt_error}")
+                import traceback
+                traceback.print_exc()
+                raise
+            print(f"🔍 About to calculate current month...")
+            current_month = datetime.now().strftime("%Y-%m")
+            print(f"🔍 Current month: {current_month}")
+            
+            user_key = f"{user_id}_{current_month}"
+            print(f"🔍 User key: {user_key}")
+            
+            print(f"🔍 About to access simple_usage_tracker...")
+            try:
+                print(f"🔍 simple_usage_tracker type: {type(simple_usage_tracker)}")
+                print(f"🔍 simple_usage_tracker contents: {simple_usage_tracker}")
+                print(f"🔍 About to call .get() method...")
+                current_usage = simple_usage_tracker.get(user_key, 0)
+                print(f"🔍 current_usage retrieved: {current_usage}")
+            except Exception as tracker_error:
+                print(f"❌ TRACKER ACCESS ERROR: {tracker_error}")
+                import traceback
+                traceback.print_exc()
+                # Set safe fallback
+                current_usage = 0
+                print(f"🔍 Using fallback current_usage: {current_usage}")
+            print(f"🔍 Current usage: {current_usage}")
+            
+            projected_usage = current_usage + pages_processed
+            print(f"🔍 Projected usage: {projected_usage}")
+            
+            # Get user's limit
+            plan_limits = {
+                "free": 10,
+                "student": 500, 
+                "growth": 2500,
+                "business": 10000
+            }
+            print(f"🔍 Plan limits defined: {plan_limits}")
+            
+            user_limit = plan_limits.get(current_user.subscription_tier, 10)
+            print(f"🔍 User limit for {current_user.subscription_tier}: {user_limit}")
+            
+            print(f"📊 LIMIT CHECK: User {user_id} ({current_user.subscription_tier}): {current_usage} + {pages_processed} = {projected_usage}/{user_limit}")
+            
+            # BLOCK if would exceed limit
+            if projected_usage > user_limit:
+                print(f"❌ LIMIT EXCEEDED - blocking request")
+                raise HTTPException(
+                    status_code=429,
+                    detail={
+                        "error": "Monthly limit exceeded",
+                        "message": f"This document would use {pages_processed} pages, but you only have {user_limit - current_usage} pages remaining this month.",
+                        "current_usage": current_usage,
+                        "limit": user_limit,
+                        "pages_needed": pages_processed,
+                        "upgrade_url": "/pricing"
+                    }
+                )
+            print("✅ Usage limits passed - proceeding with processing")
             # Authentication is now required - this shouldn't happen
             print("✅ User authenticated successfully")
         except HTTPException as http_error:
