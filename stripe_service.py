@@ -278,6 +278,25 @@ class StripeService:
                 "error": "Stripe not available"
             }
             
+        # FORCE re-set API key to handle Railway threading issues
+        import os
+        stripe_api_key = (
+            os.getenv("STRIPE_SECRET_KEY") or
+            os.getenv("STRIPE_SECRET") or 
+            os.getenv("STRIPE_API_KEY") or
+            os.getenv("SK_SECRET_KEY")
+        )
+        
+        if not stripe_api_key:
+            print("❌ CANCEL DEBUG: No Stripe API key found in environment")
+            return {
+                "success": False,
+                "error": "Stripe API key not configured"
+            }
+            
+        print(f"🔍 CANCEL DEBUG: Force-setting API key: {stripe_api_key[:12]}...")
+        stripe.api_key = stripe_api_key.strip()
+        
         # Test Stripe API key before proceeding
         try:
             print("🔍 CANCEL DEBUG: Testing Stripe API key...")
