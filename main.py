@@ -1982,6 +1982,21 @@ def home():
             uploadArea.addEventListener('drop', handleDrop, false);
             
             function handleDrop(e) {
+                // Check authentication first (same as handleFileSelect)
+                const isLoggedIn = localStorage.getItem('pdf_parser_logged_in');
+                const apiKey = localStorage.getItem('pdf_parser_api_key');
+                if (!isLoggedIn || !apiKey) {
+                    // Show login section if not logged in
+                    document.getElementById('login-section').style.display = 'block';
+                    document.querySelector('.upload-area h3').textContent = 'Please sign in to upload files';
+                    document.querySelector('.upload-area h3').style.color = '#ef4444';
+                    setTimeout(() => {
+                        document.querySelector('.upload-area h3').textContent = 'Upload Your PDF';
+                        document.querySelector('.upload-area h3').style.color = '';
+                    }, 3000);
+                    return;
+                }
+                
                 const dt = e.dataTransfer;
                 const files = dt.files;
                 
@@ -1993,7 +2008,7 @@ def home():
                         document.querySelector('.upload-area h3').textContent = 'Please drop a valid PDF file';
                         document.querySelector('.upload-area h3').style.color = '#ef4444';
                         setTimeout(() => {
-                            document.querySelector('.upload-area h3').textContent = 'Upload Your PDF - FREE';
+                            document.querySelector('.upload-area h3').textContent = 'Upload Your PDF';
                             document.querySelector('.upload-area h3').style.color = '';
                         }, 3000);
                     }
