@@ -160,6 +160,7 @@ class StripeService:
                 overage_rate=0.008,
                 features=[
                     "10,000 pages/month",
+                    "500 AI documents/month",
                     "Faster processing queues",
                     "Performance dashboard",
                     "Phone + chat support",
@@ -326,9 +327,15 @@ class StripeService:
                     for subscription in subscriptions.data:
                         try:
                             if subscription.status in ["active", "past_due", "unpaid", "paused"]:
-                                canceled_sub = stripe.Subscription.cancel(subscription.id)
+                                # Cancel immediately (not at period end) to prevent future billing
+                                canceled_sub = stripe.Subscription.cancel(
+                                    subscription.id,
+                                    prorate=False,  # Don't charge partial amounts
+                                    invoice_now=False  # Don't create final invoice
+                                )
                                 canceled_count += 1
-                                print(f"✅ FORCEFULLY canceled {subscription.status} subscription {subscription.id} for {customer_email}")
+                                print(f"✅ IMMEDIATELY canceled {subscription.status} subscription {subscription.id} for {customer_email}")
+                                print(f"   Status after cancellation: {canceled_sub.status}")
                         except Exception as cancel_error:
                             failed_cancellations.append({
                                 "subscription_id": subscription.id,
