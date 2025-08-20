@@ -1356,10 +1356,9 @@ def home():
                     <input type="file" id="fileInput" style="display: none;" accept=".pdf" onchange="handleFileSelect(event)">
                 </div>
                 
-                <!-- Login/Account Section -->
+                <!-- Account Section (for logged in users) -->
                 <div id="account-section" style="margin-top: 2rem; text-align: center; display: none;">
                     <div style="background: var(--background-secondary); padding: 1rem; border-radius: var(--border-radius); margin-bottom: 1rem;">
-                        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Welcome back!</h4>
                         <p style="color: var(--text-secondary); font-size: 0.875rem;">You're logged in with unlimited processing</p>
                         <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
                             <a href="/dashboard" class="btn-secondary" style="font-size: 0.875rem; padding: 0.5rem 1rem; text-decoration: none; display: inline-block;">📊 Dashboard</a>
