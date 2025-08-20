@@ -4885,12 +4885,13 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                 }}
                 
                 function cancelSubscription() {{
-                    if (!confirm('Are you sure you want to cancel your subscription? You will keep access until your current billing period ends, then switch to the free plan.')) {{
+                    if (!confirm('Are you sure you want to cancel your subscription? This will immediately downgrade your account to the free plan (15 uploads/hour, 10 pages/month).')) {{
                         return;
                     }}
                     
-                    event.target.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Canceling...';
-                    event.target.disabled = true;
+                    const button = event.target;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Canceling...';
+                    button.disabled = true;
                     
                     fetch('/cancel-subscription', {{
                         method: 'POST',
@@ -4898,22 +4899,28 @@ async def user_dashboard(current_user = Depends(get_current_user_optional)):
                             'Content-Type': 'application/json',
                         }}
                     }})
-                    .then(response => response.json())
+                    .then(response => {{
+                        if (!response.ok) {{
+                            throw new Error(`HTTP error! status: ${{response.status}}`);
+                        }}
+                        return response.json();
+                    }})
                     .then(data => {{
+                        console.log('Cancellation response:', data);
                         if (data.success) {{
-                            alert('Subscription canceled successfully. You will keep access until your current billing period ends.');
+                            alert(data.message || 'Subscription canceled successfully. You are now on the free plan.');
                             location.reload();
                         }} else {{
                             alert('Error canceling subscription: ' + (data.error || 'Unknown error'));
-                            event.target.innerHTML = '❌ Cancel Subscription';
-                            event.target.disabled = false;
+                            button.innerHTML = '❌ Cancel Subscription';
+                            button.disabled = false;
                         }}
                     }})
                     .catch(error => {{
-                        console.error('Error:', error);
-                        alert('Error canceling subscription. Please try again or contact support.');
-                        event.target.innerHTML = '❌ Cancel Subscription';
-                        event.target.disabled = false;
+                        console.error('Cancellation error:', error);
+                        alert('Error canceling subscription: ' + error.message + '. Please try again or contact support.');
+                        button.innerHTML = '❌ Cancel Subscription';
+                        button.disabled = false;
                     }});
                 }}
             </script>
@@ -4965,40 +4972,64 @@ async def cancel_subscription(current_user = Depends(get_current_user_optional))
         if current_user.subscription_tier == "free":
             return JSONResponse({"success": False, "error": "Already on free plan"})
         
-        # COMPLETE CANCELLATION: Cancel in Stripe AND downgrade locally
+        print(f"🔥 Starting cancellation for {current_user.email} (tier: {current_user.subscription_tier})")
+        
+        # ENHANCED CANCELLATION: Try multiple approaches to ensure success
         stripe_result = {"success": False, "error": "Stripe not available"}
         
-        # 1. Cancel all Stripe subscriptions for this user
+        # 1. Attempt Stripe cancellation (but don't fail if this doesn't work)
         if stripe_service and stripe_service.available:
             try:
                 stripe_result = stripe_service.cancel_subscription(current_user.email)
                 print(f"🔥 Stripe cancellation result: {stripe_result}")
             except Exception as e:
-                print(f"❌ Stripe cancellation failed: {e}")
+                print(f"⚠️ Stripe cancellation failed (continuing anyway): {e}")
                 stripe_result = {"success": False, "error": str(e)}
-        
-        # 2. Downgrade user locally (always do this, even if Stripe fails)
-        if auth_system:
-            auth_system.upgrade_customer(current_user.api_key, "free")
-            current_user.subscription_tier = "free"
-            
-            message = "Subscription canceled successfully. You are now on the free plan."
-            if stripe_result.get("success"):
-                message += f" Canceled {stripe_result.get('canceled_count', 0)} Stripe subscription(s)."
-            else:
-                message += " Note: Stripe cancellation may have failed - contact support if you continue to be charged."
-            
-            return JSONResponse({
-                "success": True,
-                "message": message,
-                "stripe_canceled": stripe_result.get("success", False)
-            })
         else:
-            return JSONResponse({"success": False, "error": "Cancellation service unavailable"})
+            print("⚠️ Stripe service not available (continuing with local cancellation)")
+        
+        # 2. ALWAYS downgrade user locally (this is the critical part)
+        if auth_system:
+            try:
+                # Downgrade to free tier
+                auth_system.upgrade_customer(current_user.api_key, SubscriptionTier.FREE)
+                current_user.subscription_tier = SubscriptionTier.FREE
+                
+                # Reset usage to free tier limits
+                current_month = datetime.now().strftime("%Y-%m")
+                user_key = f"{current_user.customer_id}_{current_month}"
+                simple_usage_tracker[user_key] = 0  # Reset usage
+                
+                print(f"✅ Successfully downgraded {current_user.email} to free tier")
+                
+                # Determine response message based on Stripe result
+                if stripe_result.get("success"):
+                    message = f"Subscription canceled successfully! Canceled {stripe_result.get('canceled_count', 0)} Stripe subscription(s). You are now on the free plan (15 uploads/hour, 10 pages/month)."
+                elif stripe_result.get("error") == "No active subscriptions found to cancel":
+                    message = "Account successfully downgraded to free plan. No active Stripe subscriptions were found (you may have been on a manually upgraded account)."
+                elif stripe_result.get("error") == "No customer found with this email":
+                    message = "Account successfully downgraded to free plan. No Stripe customer found with your email (you may have been on a manually upgraded account)."
+                else:
+                    message = "Account successfully downgraded to free plan. Note: Stripe cancellation may have failed - if you continue to be charged, please contact support."
+                
+                return JSONResponse({
+                    "success": True,
+                    "message": message,
+                    "stripe_canceled": stripe_result.get("success", False),
+                    "new_tier": "free"
+                })
+                
+            except Exception as local_error:
+                print(f"❌ Local downgrade failed: {local_error}")
+                return JSONResponse({"success": False, "error": f"Failed to downgrade account: {str(local_error)}"})
+        else:
+            return JSONResponse({"success": False, "error": "Authentication system unavailable"})
         
     except Exception as e:
         print(f"❌ Subscription cancellation error: {e}")
-        return JSONResponse({"success": False, "error": "Failed to cancel subscription"})
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"success": False, "error": "Failed to cancel subscription - please contact support"})
 
 @app.post("/auth/verify-email")
 async def verify_email(email: str = Form(...), verification_code: str = Form(...)):
