@@ -10,9 +10,10 @@ import time
 import stripe  # Re-enabled for production billing
 from typing import Optional, Dict, Any
 import json
+import secrets
 from pydantic import BaseModel
 from datetime import datetime, timedelta
-from auth_system import Customer
+from auth_system import Customer, SubscriptionTier, AuthSystem
 
 # Only keep the essential fixes that don't break registration
 
@@ -4015,6 +4016,70 @@ async def customer_portal(customer_id: str, return_url: str = "https://your-doma
     
     return result
 
+@app.get("/admin/check-user")
+async def check_user_exists(email: str, admin_key: str = "emergency_upgrade_2025"):
+    """Check if user exists in system"""
+    if admin_key != "emergency_upgrade_2025":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    customer = auth_system.get_customer_by_email(email)
+    if customer:
+        return {
+            "exists": True, 
+            "email": customer.email,
+            "customer_id": customer.customer_id,
+            "current_tier": customer.subscription_tier,
+            "created_at": customer.created_at
+        }
+    else:
+        return {"exists": False, "message": "User not found"}
+
+@app.post("/admin/create-and-upgrade-user")
+async def emergency_create_and_upgrade(email: str, tier: str, admin_key: str = "emergency_upgrade_2025"):
+    """Emergency endpoint to create user account and upgrade them (for paid customers whose accounts don't exist)"""
+    if admin_key != "emergency_upgrade_2025":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    try:
+        # Check if user already exists
+        existing_customer = auth_system.get_customer_by_email(email)
+        if existing_customer:
+            return {"error": "User already exists", "action": "Use upgrade-user endpoint instead"}
+        
+        # Validate tier
+        tier_map = {
+            "student": SubscriptionTier.STUDENT,
+            "growth": SubscriptionTier.GROWTH, 
+            "business": SubscriptionTier.BUSINESS,
+            "free": SubscriptionTier.FREE
+        }
+        new_tier = tier_map.get(tier.lower())
+        if not new_tier:
+            raise HTTPException(status_code=400, detail="Invalid tier")
+        
+        # Create account with temporary password (user will need to set real password later)
+        temp_password = f"temp_password_{secrets.token_urlsafe(16)}"
+        customer = auth_system.create_customer(email, temp_password, new_tier)
+        
+        # Reset usage counter for new billing cycle
+        current_month = datetime.now().strftime("%Y-%m")
+        user_key = f"{customer.customer_id}_{current_month}"
+        simple_usage_tracker[user_key] = 0  # Reset usage for new plan
+        
+        print(f"🚨 EMERGENCY: Created account for paid customer {email} with {tier} tier")
+        
+        return {
+            "success": True,
+            "message": f"Emergency account created for {email} with {tier} tier",
+            "customer_id": customer.customer_id,
+            "api_key": customer.api_key,
+            "temp_password": temp_password,
+            "note": "User should reset password on first login"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Emergency account creation failed: {str(e)}")
+
 @app.post("/admin/upgrade-user")
 async def manual_upgrade_user(email: str, tier: str, admin_key: str = "emergency_upgrade_2025"):
     """Emergency manual user upgrade endpoint"""
@@ -4032,18 +4097,21 @@ async def manual_upgrade_user(email: str, tier: str, admin_key: str = "emergency
         if not new_tier:
             raise HTTPException(status_code=400, detail="Invalid tier")
         
-        if auth_system.upgrade_customer(email, new_tier):
-            # Reset usage counter for new billing cycle
-            customer = auth_system.get_customer_by_email(email)
-            if customer:
-                current_month = datetime.now().strftime("%Y-%m")
-                user_key = f"{customer.customer_id}_{current_month}"
-                simple_usage_tracker[user_key] = 0  # Reset usage for new plan
-                print(f"🔄 Manual upgrade: Usage reset for {email} - {tier} tier activated")
-            
-            return {"success": True, "message": f"User {email} upgraded to {tier} tier", "usage_reset": True}
-        else:
+        # Get customer by email first
+        customer = auth_system.get_customer_by_email(email)
+        if not customer:
             raise HTTPException(status_code=404, detail="User not found")
+        
+        # Upgrade using API key (required by upgrade_customer method)
+        auth_system.upgrade_customer(customer.api_key, new_tier)
+        
+        # Reset usage counter for new billing cycle
+        current_month = datetime.now().strftime("%Y-%m")
+        user_key = f"{customer.customer_id}_{current_month}"
+        simple_usage_tracker[user_key] = 0  # Reset usage for new plan
+        print(f"🔄 Manual upgrade: Usage reset for {email} - {tier} tier activated")
+        
+        return {"success": True, "message": f"User {email} upgraded to {tier} tier", "usage_reset": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upgrade failed: {str(e)}")
 
