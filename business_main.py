@@ -305,7 +305,9 @@ async def upgrade_subscription(
     """Upgrade customer subscription"""
     try:
         subscription_tier = SubscriptionTier(new_tier.lower())
-        auth_system.upgrade_customer(customer.api_key, subscription_tier)
+        # Import usage reset function from main
+        from main import upgrade_customer_with_usage_reset
+        upgrade_customer_with_usage_reset(customer.api_key, subscription_tier, "business_api")
         
         return {
             "message": f"Upgraded to {subscription_tier.value}",

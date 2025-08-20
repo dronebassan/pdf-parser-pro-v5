@@ -4247,6 +4247,46 @@ async def stripe_webhook(request: Request):
         
         return {"status": "success", "message": "webhook failed but continuing"}
 
+# ==================== USAGE RESET UTILITY ====================
+
+def reset_user_usage(customer_id: str, reason: str = "plan_change"):
+    """Reset user's monthly usage counter"""
+    try:
+        current_month = datetime.now().strftime("%Y-%m")
+        user_key = f"{customer_id}_{current_month}"
+        simple_usage_tracker[user_key] = 0
+        print(f"🔄 Usage reset for customer {customer_id}: {reason}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to reset usage for {customer_id}: {e}")
+        return False
+
+def upgrade_customer_with_usage_reset(api_key: str, new_tier: SubscriptionTier, reason: str = "plan_upgrade"):
+    """Upgrade customer and ensure usage is reset for fresh allocation"""
+    try:
+        if not auth_system:
+            return False
+            
+        # Get customer info before upgrade
+        customer = auth_system.authenticate_api_key(api_key)
+        if not customer:
+            return False
+            
+        old_tier = customer.subscription_tier
+        
+        # Perform the upgrade
+        success = auth_system.upgrade_customer(api_key, new_tier)
+        
+        if success and old_tier != new_tier:
+            # Reset usage to give fresh allocation
+            reset_user_usage(customer.customer_id, f"{old_tier} → {new_tier}")
+            
+        return success
+        
+    except Exception as e:
+        print(f"❌ Upgrade with usage reset failed: {e}")
+        return False
+
 # ==================== BULLETPROOF UPGRADE SYSTEM ====================
 
 async def execute_bulletproof_upgrade(customer_email: str, plan: str, subscription_id: str, webhook_log: dict) -> bool:
@@ -4302,15 +4342,10 @@ async def attempt_standard_upgrade(customer_email: str, new_tier: SubscriptionTi
             webhook_log["upgrade_attempts"].append(attempt_log)
             return False
         
-        # Upgrade using API key
-        success = auth_system.upgrade_customer(customer.api_key, new_tier)
+        # Upgrade using API key and reset usage
+        success = upgrade_customer_with_usage_reset(customer.api_key, new_tier, "stripe_webhook")
         if success:
             print(f"✅ Standard upgrade successful for {customer_email}")
-            
-            # Reset usage counter
-            current_month = datetime.now().strftime("%Y-%m")
-            user_key = f"{customer.customer_id}_{current_month}"
-            simple_usage_tracker[user_key] = 0
             
             # Setup billing cycle
             if usage_tracker:
@@ -4991,14 +5026,10 @@ async def cancel_subscription(current_user = Depends(get_current_user_optional))
         # 2. ALWAYS downgrade user locally (this is the critical part)
         if auth_system:
             try:
-                # Downgrade to free tier
-                auth_system.upgrade_customer(current_user.api_key, SubscriptionTier.FREE)
-                current_user.subscription_tier = SubscriptionTier.FREE
-                
-                # Reset usage to free tier limits
-                current_month = datetime.now().strftime("%Y-%m")
-                user_key = f"{current_user.customer_id}_{current_month}"
-                simple_usage_tracker[user_key] = 0  # Reset usage
+                # Downgrade to free tier with usage reset
+                success = upgrade_customer_with_usage_reset(current_user.api_key, SubscriptionTier.FREE, "subscription_cancellation")
+                if success:
+                    current_user.subscription_tier = SubscriptionTier.FREE
                 
                 print(f"✅ Successfully downgraded {current_user.email} to free tier")
                 

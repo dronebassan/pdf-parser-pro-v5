@@ -112,6 +112,8 @@ class AuthSystem:
             if config:
                 config.subscription_tier = new_tier
                 api_key_manager.save_customer_config(config)
+            return True
+        return False
 
 # Global auth system
 auth_system = AuthSystem(secret_key="your-jwt-secret-here")
