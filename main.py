@@ -2513,7 +2513,7 @@ def pricing_page():
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">What are the upload limits?</div>
-                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free accounts (15 uploads per hour), Student (40 uploads per hour), Growth (120 uploads per hour), Business (300 uploads per hour). Anonymous users: 3 uploads per hour.</div>
+                        <div class="faq-answer">File size limit: 50MB. Rate limits vary by plan: Free accounts (15 uploads per hour), Student (40 uploads per hour), Growth (120 uploads per hour), Business (300 uploads per hour). Anonymous users: 5 uploads per hour.</div>
                     </div>
                     <div class="faq-item">
                         <div class="faq-question" onclick="toggleFaq(this)">Can I cancel anytime?</div>
@@ -3415,9 +3415,9 @@ async def parse_pdf_advanced(
         else:
             max_uploads_per_hour = 15    # Free accounts with login - taste of premium
     else:
-        # Anonymous users: strict limits to encourage signup
+        # Anonymous users: reasonable limits to allow testing while encouraging signup  
         user_key = f"anon_{client_ip}"
-        max_uploads_per_hour = 3     # Very limited - must create account
+        max_uploads_per_hour = 5     # Allows proper testing - encourages account creation
     
     # Clean old entries (older than 1 hour)
     if user_key in user_upload_history:
@@ -3436,7 +3436,7 @@ async def parse_pdf_advanced(
         if current_user:
             detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Try again in {minutes_left} minutes, or upgrade for higher limits."
         else:
-            detail = f"Rate limit exceeded: {max_uploads_per_hour} uploads per hour. Create a free account for higher limits, or try again in {minutes_left} minutes."
+            detail = f"Anonymous limit reached: {max_uploads_per_hour} uploads per hour. ✨ Create a FREE account to get 15 uploads/hour immediately! Or try again in {minutes_left} minutes."
             
         raise HTTPException(status_code=429, detail=detail)
     
