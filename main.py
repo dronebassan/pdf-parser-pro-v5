@@ -5076,9 +5076,12 @@ async def create_portal_session(request: Request, current_user = Depends(get_cur
         }
 
 @app.post("/cancel-subscription")
-async def cancel_subscription(current_user = Depends(get_current_user)):
+async def cancel_subscription(current_user = Depends(get_current_user_optional)):
     """Cancel user's subscription and downgrade to free tier"""
     
+    
+    if not current_user:
+        return JSONResponse({"success": False, "error": "Not authenticated"})
     
     try:
         if current_user.subscription_tier == "free":
